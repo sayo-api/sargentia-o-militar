@@ -1,0 +1,114 @@
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE UTILITIES — Admin Pages
+   Classes para substituir grids inline que não respondem
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Grids responsivos */
+.rg-2  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rg-3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.rg-4  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.rg-rotina { display: grid; grid-template-columns: 90px 1fr 130px auto; gap: 8px; align-items: flex-end; }
+
+/* Toolbar / action rows */
+.toolbar-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar-row > .btn { flex-shrink: 0; }
+
+/* Tabela planilha — scroll horizontal */
+.planilha-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; }
+
+/* Schedule layout override */
+.schedule-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 340px) 1fr;
+  gap: 20px;
+}
+
+/* ── 1024px ── */
+@media (max-width: 1024px) {
+  .rg-4  { grid-template-columns: repeat(2, 1fr) !important; }
+  .schedule-admin-layout { grid-template-columns: 1fr !important; }
+}
+
+/* ── 768px — mobile ── */
+@media (max-width: 768px) {
+  .rg-2      { grid-template-columns: 1fr !important; gap: 10px !important; }
+  .rg-3      { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+  .rg-4      { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+  .rg-rotina { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .rg-rotina > *:nth-child(3) { grid-column: 1 / -1; }
+
+  .schedule-admin-layout { grid-template-columns: 1fr !important; }
+
+  /* Botões de ação viram linha */
+  .action-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .action-btns .btn { flex: 1; min-width: 100px; justify-content: center; }
+}
+
+/* ── 480px ── */
+@media (max-width: 480px) {
+  .rg-2  { grid-template-columns: 1fr !important; }
+  .rg-3  { grid-template-columns: 1fr !important; }
+  .rg-4  { grid-template-columns: 1fr !important; }
+  .rg-rotina { grid-template-columns: 1fr !important; }
+  .rg-rotina > * { grid-column: auto !important; }
+}
+
+/* ── Tabela de usuários (tbody scroll) ── */
+.users-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 768px) {
+  .users-table-wrap table { min-width: 520px; }
+}
+
+/* ── Word editor toolbar ── */
+@media (max-width: 768px) {
+  .word-toolbar { flex-wrap: wrap; gap: 4px; padding: 6px 8px; overflow-x: auto; }
+  .word-toolbar .btn-sm { padding: 5px 8px; font-size: 0.7rem; }
+  .word-editor  { min-height: 300px; font-size: 0.9rem; }
+}
+
+/* ── Planilha toolbar ── */
+@media (max-width: 768px) {
+  .planilha-toolbar { flex-wrap: wrap; gap: 4px; }
+  .planilha-toolbar .btn { padding: 5px 8px; font-size: 0.7rem; }
+}
+
+/* ── Boletim preview print ── */
+@media (max-width: 768px) {
+  .boletim-preview-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .boletim-print { min-width: 580px; }
+}
+
+/* ── Relatórios ── */
+@media (max-width: 768px) {
+  .rel-chart-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .rel-chart-wrap svg, .rel-chart-wrap canvas { min-width: 320px; }
+}
+
+/* ── Efetivo / Parte do Dia ── */
+@media (max-width: 768px) {
+  .efetivo-header-row { flex-direction: column; gap: 8px; align-items: stretch !important; }
+  .efetivo-header-row .btn { width: 100%; justify-content: center; }
+}
+
+/* ── Ordens do dia ── */
+@media (max-width: 768px) {
+  .ordem-card { flex-direction: column; }
+  .ordem-card .btn-group { flex-wrap: wrap; gap: 6px; }
+  .ordem-card .btn-group .btn { flex: 1; min-width: 90px; justify-content: center; }
+}
+
+/* ── Historico Page ── */
+.hist-list-card {
+  height: calc(100vh - 180px);
+  min-height: 300px;
+}
+@media (max-width: 768px) {
+  .hist-list-card {
+    height: 400px !important;
+  }
+}
+@media (max-width: 480px) {
+  .hist-list-card {
+    height: 320px !important;
+  }
+}
