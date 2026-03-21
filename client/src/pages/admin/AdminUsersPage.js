@@ -18,7 +18,7 @@ const SIT_COLORS = {
   'Licença Especial':'#d35400','Inativo':'#555',
 };
 
-const EMPTY = { warNumber:'',warName:'',nomeCompleto:'',rank:'Soldado',pelotao:'',companhia:'',funcao:'',situacao:'Ativo',telefone:'',observacoes:'' };
+const EMPTY = { warNumber:'',warName:'',nomeCompleto:'',rank:'Soldado',pelotao:'',companhia:'',funcao:'',situacao:'Ativo',telefone:'',observacoes:'',hasChamadaAccess:false,hasRelatorioAccess:false };
 
 export default function AdminUsersPage() {
   const [users, setUsers]     = useState([]);
@@ -68,7 +68,7 @@ export default function AdminUsersPage() {
   };
 
   const openCreate = () => { setEditUser(null); setForm(EMPTY); setShowModal(true); };
-  const openEdit = (u) => { setEditUser(u); setForm({ warNumber:u.warNumber, warName:u.warName, nomeCompleto:u.nomeCompleto||'', rank:u.rank, pelotao:u.pelotao||'', companhia:u.companhia||'', funcao:u.funcao||'', situacao:u.situacao||'Ativo', telefone:u.telefone||'', observacoes:u.observacoes||'' }); setShowModal(true); };
+  const openEdit = (u) => { setEditUser(u); setForm({ warNumber:u.warNumber, warName:u.warName, nomeCompleto:u.nomeCompleto||'', rank:u.rank, pelotao:u.pelotao||'', companhia:u.companhia||'', funcao:u.funcao||'', situacao:u.situacao||'Ativo', telefone:u.telefone||'', observacoes:u.observacoes||'', hasChamadaAccess:u.hasChamadaAccess||false, hasRelatorioAccess:u.hasRelatorioAccess||false }); setShowModal(true); };
   const handleDelete = async (u) => {
     if (!window.confirm(`Remover ${u.warName}?`)) return;
     try { await api.delete(`/users/${u._id}`); fetchUsers(); fetchEfetivo(); toast.success('Removido'); }
@@ -220,6 +220,18 @@ export default function AdminUsersPage() {
                       {u.active?'Ativo':'Inativo'}
                     </span>
                   </td>
+                  <td style={{padding:'8px 6px'}}>
+                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:'0.55rem',fontFamily:'var(--font-display)',letterSpacing:'0.04em',color:u.hasChamadaAccess?'#27ae60':'#555',whiteSpace:'nowrap'}}>
+                        <span style={{width:5,height:5,borderRadius:'50%',background:u.hasChamadaAccess?'#27ae60':'#555',flexShrink:0}}/>
+                        {u.hasChamadaAccess ? '📋 Chamada' : '📋 —'}
+                      </span>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:'0.55rem',fontFamily:'var(--font-display)',letterSpacing:'0.04em',color:u.hasRelatorioAccess?'#f39c12':'#555',whiteSpace:'nowrap'}}>
+                        <span style={{width:5,height:5,borderRadius:'50%',background:u.hasRelatorioAccess?'#f39c12':'#555',flexShrink:0}}/>
+                        {u.hasRelatorioAccess ? '📊 Relatório' : '📊 —'}
+                      </span>
+                    </div>
+                  </td>
                   <td style={{padding:'8px 10px'}} onClick={e=>e.stopPropagation()}>
                     <div style={{display:'flex',gap:4}}>
                       <button className="btn btn-ghost btn-xs" onClick={()=>openEdit(u)} title="Editar">✏</button>
@@ -336,6 +348,104 @@ export default function AdminUsersPage() {
                 <div className="form-group">
                   <label className="form-label">Observações</label>
                   <textarea className="form-control" value={form.observacoes} onChange={e=>f('observacoes',e.target.value)} rows={2} placeholder="Restrições, informações adicionais..." />
+                </div>
+
+                {/* ── PERMISSÕES DE ACESSO ── */}
+                <div style={{marginTop:18}}>
+                  <div style={{
+                    fontSize:'0.56rem',fontFamily:'var(--font-display)',letterSpacing:'0.1em',
+                    textTransform:'uppercase',color:'var(--accent)',marginBottom:10,
+                    display:'flex',alignItems:'center',gap:8,
+                  }}>
+                    <span>🔐</span> Permissões de Acesso ao Sistema
+                    <span style={{flex:1,height:1,background:'var(--border)'}}/>
+                  </div>
+
+                  {/* Chamada */}
+                  <div
+                    onClick={() => f('hasChamadaAccess', !form.hasChamadaAccess)}
+                    style={{
+                      display:'flex',alignItems:'center',gap:14,
+                      padding:'12px 14px',marginBottom:8,
+                      background: form.hasChamadaAccess ? 'rgba(39,174,96,0.07)' : 'var(--bg-dark)',
+                      border: `1px solid ${form.hasChamadaAccess ? 'rgba(39,174,96,0.4)' : 'var(--border)'}`,
+                      borderLeft: `4px solid ${form.hasChamadaAccess ? '#27ae60' : 'var(--border)'}`,
+                      borderRadius:4,cursor:'pointer',userSelect:'none',transition:'all .15s',
+                    }}
+                  >
+                    <span style={{fontSize:'1.4rem',lineHeight:1,flexShrink:0}}>📋</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:'var(--font-display)',fontSize:'0.72rem',letterSpacing:'0.05em',textTransform:'uppercase',color:'var(--text-primary)',marginBottom:2}}>
+                        Sistema de Chamada
+                      </div>
+                      <div style={{fontSize:'0.62rem',color:'var(--text-muted)'}}>
+                        Marcar presença diária · Auditar fardamento e TFM
+                      </div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,flexShrink:0}}>
+                      <span style={{fontSize:'0.55rem',fontFamily:'var(--font-display)',letterSpacing:'0.07em',fontWeight:700,textTransform:'uppercase',color:form.hasChamadaAccess?'#27ae60':'var(--text-muted)'}}>
+                        {form.hasChamadaAccess ? 'LIBERADO' : 'BLOQUEADO'}
+                      </span>
+                      <div style={{
+                        position:'relative',width:46,height:24,borderRadius:24,
+                        border:`2px solid ${form.hasChamadaAccess?'#27ae60':'var(--border)'}`,
+                        background:form.hasChamadaAccess?'#0a2a12':'var(--bg-dark)',
+                        transition:'all .2s',flexShrink:0,
+                        boxShadow:form.hasChamadaAccess?'0 0 8px rgba(39,174,96,0.3)':'none',
+                      }}>
+                        <span style={{
+                          position:'absolute',width:16,height:16,borderRadius:'50%',top:2,
+                          background:form.hasChamadaAccess?'#27ae60':'#666',
+                          transform:`translateX(${form.hasChamadaAccess?22:2}px)`,
+                          transition:'all .2s',
+                          boxShadow:form.hasChamadaAccess?'0 0 6px rgba(39,174,96,0.6)':'none',
+                        }}/>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Relatório */}
+                  <div
+                    onClick={() => f('hasRelatorioAccess', !form.hasRelatorioAccess)}
+                    style={{
+                      display:'flex',alignItems:'center',gap:14,
+                      padding:'12px 14px',
+                      background: form.hasRelatorioAccess ? 'rgba(243,156,18,0.07)' : 'var(--bg-dark)',
+                      border: `1px solid ${form.hasRelatorioAccess ? 'rgba(243,156,18,0.4)' : 'var(--border)'}`,
+                      borderLeft: `4px solid ${form.hasRelatorioAccess ? '#f39c12' : 'var(--border)'}`,
+                      borderRadius:4,cursor:'pointer',userSelect:'none',transition:'all .15s',
+                    }}
+                  >
+                    <span style={{fontSize:'1.4rem',lineHeight:1,flexShrink:0}}>📊</span>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:'var(--font-display)',fontSize:'0.72rem',letterSpacing:'0.05em',textTransform:'uppercase',color:'var(--text-primary)',marginBottom:2}}>
+                        Painel de Relatórios
+                      </div>
+                      <div style={{fontSize:'0.62rem',color:'var(--text-muted)'}}>
+                        Ver chamadas enviadas · Histórico do efetivo · Relatórios
+                      </div>
+                    </div>
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4,flexShrink:0}}>
+                      <span style={{fontSize:'0.55rem',fontFamily:'var(--font-display)',letterSpacing:'0.07em',fontWeight:700,textTransform:'uppercase',color:form.hasRelatorioAccess?'#f39c12':'var(--text-muted)'}}>
+                        {form.hasRelatorioAccess ? 'LIBERADO' : 'BLOQUEADO'}
+                      </span>
+                      <div style={{
+                        position:'relative',width:46,height:24,borderRadius:24,
+                        border:`2px solid ${form.hasRelatorioAccess?'#f39c12':'var(--border)'}`,
+                        background:form.hasRelatorioAccess?'#2a1603':'var(--bg-dark)',
+                        transition:'all .2s',flexShrink:0,
+                        boxShadow:form.hasRelatorioAccess?'0 0 8px rgba(243,156,18,0.3)':'none',
+                      }}>
+                        <span style={{
+                          position:'absolute',width:16,height:16,borderRadius:'50%',top:2,
+                          background:form.hasRelatorioAccess?'#f39c12':'#666',
+                          transform:`translateX(${form.hasRelatorioAccess?22:2}px)`,
+                          transition:'all .2s',
+                          boxShadow:form.hasRelatorioAccess?'0 0 6px rgba(243,156,18,0.6)':'none',
+                        }}/>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="modal-footer">

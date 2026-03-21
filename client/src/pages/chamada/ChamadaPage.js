@@ -1,29 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import {
+  ClipboardList, Plus, Check, X, Clock, Search,
+  Send, RefreshCw, ChevronLeft, Users, Calendar,
+  MoreVertical, Info, AlertCircle,
+} from 'lucide-react';
+
 import './Chamada.css';
 
 const TURNOS = [
-  { id: 'geral', label: 'Geral' },
-  { id: 'manha', label: 'Manhã' },
-  { id: 'tarde', label: 'Tarde' },
-  { id: 'noite', label: 'Noite' },
+  { id:'geral', label:'Geral' },
+  { id:'manha', label:'Manhã' },
+  { id:'tarde', label:'Tarde' },
+  { id:'noite', label:'Noite' },
 ];
 
 function fmtDate(d) {
-  const dt = new Date(d);
-  return dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-// ─── Modal: Detalhes / Atraso de soldado ─────────────────────────────────────
+// ─── Modal detalhes soldado ───────────────────────────────────────────────────
 function SoldierDetailModal({ soldier, onSave, onClose }) {
-  const [atrasado,       setAtrasado]       = useState(soldier.atrasado || false);
+  const [atrasado, setAtrasado]             = useState(soldier.atrasado || false);
   const [horarioChegada, setHorarioChegada] = useState(soldier.horarioChegada || '');
-  const [observacao,     setObservacao]     = useState(soldier.observacao || '');
+  const [observacao, setObservacao]         = useState(soldier.observacao || '');
   const u = soldier.user;
 
   return (
@@ -31,57 +36,47 @@ function SoldierDetailModal({ soldier, onSave, onClose }) {
       <div className="ch-modal" onClick={e => e.stopPropagation()}>
         <div className="ch-modal-header">
           <div>
-            <div className="ch-modal-title">Detalhes do Soldado</div>
-            <div className="ch-modal-subtitle">
-              {u?.rank} {u?.warName} — Nr. {u?.warNumber}
-            </div>
+            <div className="ch-modal-title"><Info size={16}/> Detalhes</div>
+            <div className="ch-modal-subtitle">{u?.rank} {u?.warName} · Nr. {u?.warNumber}</div>
           </div>
-          <button className="ch-modal-close" onClick={onClose}>✕</button>
+          <button className="ch-modal-close" onClick={onClose}><X size={15}/></button>
         </div>
-
         <div className="ch-modal-body">
-          <label className="ch-label">Status de presença</label>
           <div className="ch-presence-info">
+            <label className="ch-label">Status</label>
             <span className={`ch-badge ${soldier.presente ? 'presente' : 'falta'}`}>
-              {soldier.presente ? '✔ Presente' : '✘ Em Falta'}
+              {soldier.presente ? <><Check size={12}/> Presente</> : <><X size={12}/> Em Falta</>}
             </span>
           </div>
-
           {soldier.presente && (
             <>
-              <label className="ch-label" style={{ marginTop: 16 }}>
-                <input type="checkbox" checked={atrasado} onChange={e => setAtrasado(e.target.checked)} />
-                {' '}Marcou presença com atraso?
+              <label className="ch-label" style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:4}}>
+                <input type="checkbox" checked={atrasado} onChange={e => setAtrasado(e.target.checked)}/>
+                Marcou presença com atraso?
               </label>
-
               {atrasado && (
-                <>
-                  <label className="ch-label" style={{ marginTop: 12 }}>Horário de chegada</label>
-                  <input
-                    type="time"
-                    className="ch-input"
-                    value={horarioChegada}
-                    onChange={e => setHorarioChegada(e.target.value)}
-                  />
-                </>
+                <div>
+                  <label className="ch-label">Horário de chegada</label>
+                  <input type="time" className="ch-input" value={horarioChegada} onChange={e => setHorarioChegada(e.target.value)}/>
+                </div>
               )}
             </>
           )}
-
-          <label className="ch-label" style={{ marginTop: 16 }}>Observação (opcional)</label>
-          <textarea
-            className="ch-input ch-textarea"
-            rows={3}
-            placeholder="Ex: Apresentou atestado, chegou com equipamento incorreto..."
-            value={observacao}
-            onChange={e => setObservacao(e.target.value)}
-          />
+          <div>
+            <label className="ch-label">Observação</label>
+            <textarea
+              className="ch-input ch-textarea"
+              rows={3}
+              placeholder="Ex: Apresentou atestado, equipamento incorreto..."
+              value={observacao}
+              onChange={e => setObservacao(e.target.value)}
+            />
+          </div>
         </div>
-
         <div className="ch-modal-footer">
           <button className="ch-btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="ch-btn-primary" onClick={() => onSave({ atrasado, horarioChegada, observacao })}>
-            ✔ Salvar
+            <Check size={14}/> Salvar
           </button>
         </div>
       </div>
@@ -89,47 +84,27 @@ function SoldierDetailModal({ soldier, onSave, onClose }) {
   );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+// ─── Página principal ─────────────────────────────────────────────────────────
 export default function ChamadaPage() {
-  const [chamada,       setChamada]       = useState(null);
-  const [loading,       setLoading]       = useState(false);
-  const [savingId,      setSavingId]      = useState(null);
-  const [selectedDate,  setSelectedDate]  = useState(todayISO());
-  const [selectedTurno, setSelectedTurno] = useState('geral');
-  const [detailSoldier, setDetailSoldier] = useState(null);
-  const [view,          setView]          = useState('lista'); // 'lista' | 'iniciar'
-  const [chamadas,      setChamadas]      = useState([]);
-  const [search,        setSearch]        = useState('');
+  const [chamada,        setChamada]       = useState(null);
+  const [loading,        setLoading]       = useState(false);
+  const [savingId,       setSavingId]      = useState(null);
+  const [selectedDate,   setSelectedDate]  = useState(todayISO());
+  const [selectedTurno,  setSelectedTurno] = useState('geral');
+  const [detailSoldier,  setDetailSoldier] = useState(null);
+  const [view,           setView]          = useState('lista');
+  const [chamadas,       setChamadas]      = useState([]);
+  const [search,         setSearch]        = useState('');
 
-  // ── Buscar chamadas recentes ──────────────────────────────────────────────
   const fetchChamadas = useCallback(async () => {
     try {
-      const res = await api.get('/chamada?limit=20');
-      setChamadas(res.data);
-    } catch (err) {
-      toast.error('Erro ao carregar chamadas.');
-    }
+      const res = await api.get('/chamada?limit=30');
+      setChamadas(Array.isArray(res.data) ? res.data : []);
+    } catch { toast.error('Erro ao carregar chamadas.'); }
   }, []);
 
-  // ── Carregar chamada do dia/turno selecionado ─────────────────────────────
-  const fetchChamadaDoDia = useCallback(async (date, turno) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/chamada?date=${date}`);
-      const found = res.data.find(c => c.turno === turno);
-      setChamada(found || null);
-    } catch (err) {
-      toast.error('Erro ao carregar chamada.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => { fetchChamadas(); }, [fetchChamadas]);
 
-  useEffect(() => {
-    fetchChamadas();
-  }, [fetchChamadas]);
-
-  // ── Iniciar nova chamada ──────────────────────────────────────────────────
   const iniciarChamada = async () => {
     setLoading(true);
     try {
@@ -142,16 +117,13 @@ export default function ChamadaPage() {
       if (err.response?.status === 409) {
         setChamada(err.response.data.chamada);
         setView('lista');
-        toast('Chamada já existe para este dia/turno.', { icon: 'ℹ️' });
+        toast('Chamada já existe para este dia/turno — carregada.', { icon: 'ℹ️' });
       } else {
-        toast.error('Erro ao iniciar chamada.');
+        toast.error(err.response?.data?.message || 'Erro ao iniciar chamada.');
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  // ── Marcar presença ───────────────────────────────────────────────────────
   const marcarPresenca = async (soldier, presente) => {
     if (!chamada) return;
     setSavingId(soldier.user._id);
@@ -160,14 +132,10 @@ export default function ChamadaPage() {
         soldiers: [{ userId: soldier.user._id, presente }],
       });
       setChamada(res.data);
-    } catch (err) {
-      toast.error('Erro ao atualizar presença.');
-    } finally {
-      setSavingId(null);
-    }
+    } catch { toast.error('Erro ao atualizar presença.'); }
+    finally  { setSavingId(null); }
   };
 
-  // ── Salvar detalhes (atraso / obs) ────────────────────────────────────────
   const salvarDetalhes = async ({ atrasado, horarioChegada, observacao }) => {
     if (!chamada || !detailSoldier) return;
     try {
@@ -177,231 +145,205 @@ export default function ChamadaPage() {
       setChamada(res.data);
       setDetailSoldier(null);
       toast.success('Atualizado!');
-    } catch (err) {
-      toast.error('Erro ao salvar detalhes.');
-    }
+    } catch { toast.error('Erro ao salvar detalhes.'); }
   };
 
-  // ── Enviar chamada ────────────────────────────────────────────────────────
   const enviarChamada = async () => {
     if (!chamada) return;
     const sem = chamada.soldiers.filter(s => s.presente === null).length;
-    if (sem > 0 && !window.confirm(`${sem} soldado(s) ainda sem marcação. Enviar mesmo assim?`)) return;
+    if (sem > 0 && !window.confirm(`${sem} soldado(s) sem marcação. Enviar mesmo assim?`)) return;
     try {
       const res = await api.post(`/chamada/${chamada._id}/enviar`);
       setChamada(res.data);
       fetchChamadas();
-      toast.success('Chamada enviada!');
-    } catch (err) {
-      toast.error('Erro ao enviar chamada.');
-    }
+      toast.success('Chamada enviada com sucesso!');
+    } catch { toast.error('Erro ao enviar chamada.'); }
   };
 
-  // ── Reabrir chamada ───────────────────────────────────────────────────────
   const reabrirChamada = async () => {
     if (!chamada) return;
     try {
       const res = await api.post(`/chamada/${chamada._id}/reabrir`);
       setChamada(res.data);
       toast.success('Chamada reaberta!');
-    } catch (err) {
-      toast.error('Erro ao reabrir chamada.');
-    }
+    } catch { toast.error('Erro ao reabrir chamada.'); }
   };
 
-  // ── Filtrar soldados ──────────────────────────────────────────────────────
-  const filteredSoldiers = chamada?.soldiers?.filter(s => {
+  const filteredSoldiers = (chamada?.soldiers || []).filter(s => {
     if (!search) return true;
     const u = s.user;
-    return (
-      u?.warName?.toLowerCase().includes(search.toLowerCase()) ||
-      String(u?.warNumber).includes(search)
-    );
-  }) || [];
+    return u?.warName?.toLowerCase().includes(search.toLowerCase()) ||
+           String(u?.warNumber || '').includes(search);
+  }).sort((a, b) => (a.user?.warNumber || 0) - (b.user?.warNumber || 0));
 
   const totalPresente = chamada?.soldiers?.filter(s => s.presente === true).length  || 0;
   const totalFalta    = chamada?.soldiers?.filter(s => s.presente === false).length || 0;
   const totalSem      = chamada?.soldiers?.filter(s => s.presente === null).length  || 0;
   const totalAtrasado = chamada?.soldiers?.filter(s => s.atrasado).length           || 0;
+  const isFinalizada  = chamada?.status === 'enviada';
 
-  const isFinalizada = chamada?.status === 'enviada';
-
-  // ── Render: Iniciar nova chamada ──────────────────────────────────────────
+  // ── View: Iniciar nova chamada ────────────────────────────────────────────
   if (view === 'iniciar') {
     return (
       <div className="ch-page">
         <div className="ch-header">
-          <button className="ch-btn-ghost" onClick={() => setView('lista')}>← Voltar</button>
-          <h1 className="ch-title">🎖️ Nova Chamada</h1>
+          <button className="ch-btn-ghost" onClick={() => setView('lista')}>
+            <ChevronLeft size={16}/> Voltar
+          </button>
+          <h1 className="ch-title">⚔ Nova Chamada</h1>
         </div>
-        <div className="ch-iniciar-card">
-          <label className="ch-label">Data</label>
-          <input type="date" className="ch-input" value={selectedDate}
-            onChange={e => setSelectedDate(e.target.value)} />
 
-          <label className="ch-label" style={{ marginTop: 16 }}>Turno</label>
-          <div className="ch-turno-grid">
-            {TURNOS.map(t => (
-              <button
-                key={t.id}
-                className={`ch-turno-btn ${selectedTurno === t.id ? 'active' : ''}`}
-                onClick={() => setSelectedTurno(t.id)}
-              >
-                {t.label}
-              </button>
-            ))}
+        <div className="ch-iniciar-card">
+          <div>
+            <label className="ch-label"><Calendar size={12}/> Data</label>
+            <input type="date" className="ch-input" value={selectedDate}
+              max={todayISO()} onChange={e => setSelectedDate(e.target.value)}/>
           </div>
 
-          <button
-            className="ch-btn-primary ch-btn-full"
-            style={{ marginTop: 24 }}
-            disabled={loading}
-            onClick={iniciarChamada}
-          >
-            {loading ? 'Iniciando...' : '▶ Iniciar Chamada'}
+          <div style={{marginTop:18}}>
+            <label className="ch-label"><Clock size={12}/> Turno</label>
+            <div className="ch-turno-grid">
+              {TURNOS.map(t => (
+                <button key={t.id}
+                  className={`ch-turno-btn ${selectedTurno === t.id ? 'active' : ''}`}
+                  onClick={() => setSelectedTurno(t.id)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button className="ch-btn-primary ch-btn-full" style={{marginTop:24}} disabled={loading} onClick={iniciarChamada}>
+            {loading ? 'Iniciando...' : <><Plus size={15}/> Iniciar Chamada</>}
           </button>
         </div>
       </div>
     );
   }
 
-  // ── Render: Chamada ativa ─────────────────────────────────────────────────
+  // ── View: Chamada ativa ───────────────────────────────────────────────────
   if (chamada) {
     const turnoLabel = TURNOS.find(t => t.id === chamada.turno)?.label || chamada.turno;
     return (
       <div className="ch-page">
-        {/* Header */}
         <div className="ch-header">
           <button className="ch-btn-ghost" onClick={() => { setChamada(null); fetchChamadas(); }}>
-            ← Chamadas
+            <ChevronLeft size={16}/> Chamadas
           </button>
-          <div>
-            <h1 className="ch-title">
-              📋 Chamada — {turnoLabel} · {fmtDate(chamada.date)}
+          <div style={{flex:1}}>
+            <h1 className="ch-title" style={{fontSize:'1rem'}}>
+              <ClipboardList size={16}/> {turnoLabel} · {fmtDate(chamada.date)}
             </h1>
             <span className={`ch-status-badge ${chamada.status}`}>
-              {chamada.status === 'aberta' ? '🟢 Aberta' : chamada.status === 'enviada' ? '✅ Enviada' : '🔄 Reaberta'}
+              {chamada.status === 'aberta'   ? <><AlertCircle size={11}/> Aberta</>   :
+               chamada.status === 'enviada'  ? <><Check size={11}/> Enviada</>        :
+               <><RefreshCw size={11}/> Reaberta</>}
             </span>
           </div>
         </div>
 
-        {/* Resumo */}
+        {/* Stats */}
         <div className="ch-stats-row">
-          <div className="ch-stat ch-stat--green">
-            <span className="ch-stat-num">{totalPresente}</span>
-            <span className="ch-stat-lbl">Presente</span>
-          </div>
-          <div className="ch-stat ch-stat--red">
-            <span className="ch-stat-num">{totalFalta}</span>
-            <span className="ch-stat-lbl">Falta</span>
-          </div>
-          <div className="ch-stat ch-stat--yellow">
-            <span className="ch-stat-num">{totalAtrasado}</span>
-            <span className="ch-stat-lbl">Atrasado</span>
-          </div>
-          <div className="ch-stat ch-stat--gray">
-            <span className="ch-stat-num">{totalSem}</span>
-            <span className="ch-stat-lbl">Sem marcação</span>
-          </div>
+          {[
+            { label:'Presente',    value:totalPresente, cls:'--green'  },
+            { label:'Falta',       value:totalFalta,    cls:'--red'    },
+            { label:'Atrasado',    value:totalAtrasado, cls:'--yellow' },
+            { label:'Sem marcação',value:totalSem,      cls:'--gray'   },
+          ].map(s => (
+            <div key={s.label} className={`ch-stat ch-stat${s.cls}`}>
+              <span className="ch-stat-num">{s.value}</span>
+              <span className="ch-stat-lbl">{s.label}</span>
+            </div>
+          ))}
         </div>
 
         {/* Busca */}
         <div className="ch-search-bar">
-          <input
-            className="ch-input"
-            placeholder="🔍  Buscar por nome ou número..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <Search size={15}/>
+          <input className="ch-input" placeholder="Buscar por nome ou número..."
+            value={search} onChange={e => setSearch(e.target.value)}/>
         </div>
 
-        {/* Lista de soldados */}
+        {/* Soldados */}
         <div className="ch-soldiers-list">
           {filteredSoldiers.map((s, idx) => {
             const u = s.user;
             const isSaving = savingId === u?._id;
-            const num = String(u?.warNumber || '?').padStart(2, '0');
             return (
-              <div key={u?._id || idx} className={`ch-soldier-row ${s.presente === true ? 'presente' : s.presente === false ? 'falta' : ''}`}>
-                <div className="ch-soldier-num">{num}</div>
+              <div key={u?._id || idx} className={`ch-soldier-row ${s.presente===true?'presente':s.presente===false?'falta':''}`}>
+                <div className="ch-soldier-num">{String(u?.warNumber||'?').padStart(2,'0')}</div>
                 <div className="ch-soldier-info">
-                  <span className="ch-soldier-name">{u?.warName || 'Desconhecido'}</span>
-                  {u?.rank && <span className="ch-soldier-rank">{u.rank}</span>}
-                  {s.atrasado && <span className="ch-badge-atrasado">⏱ Atrasado {s.horarioChegada ? `(${s.horarioChegada})` : ''}</span>}
-                  {s.observacao && <span className="ch-soldier-obs" title={s.observacao}>💬</span>}
+                  <span className="ch-soldier-name">{u?.warName || '—'}</span>
+                  <span className="ch-soldier-rank">{u?.rank}</span>
+                  {s.atrasado && (
+                    <span className="ch-badge-atrasado">
+                      <Clock size={10}/> Atrasado{s.horarioChegada ? ` ${s.horarioChegada}` : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="ch-soldier-actions">
                   {!isFinalizada && (
                     <>
-                      <button
-                        className={`ch-btn-presence presente ${s.presente === true ? 'active' : ''}`}
-                        disabled={isSaving}
-                        onClick={() => marcarPresenca(s, true)}
-                        title="Presente"
-                      >✔</button>
-                      <button
-                        className={`ch-btn-presence falta ${s.presente === false ? 'active' : ''}`}
-                        disabled={isSaving}
-                        onClick={() => marcarPresenca(s, false)}
-                        title="Em Falta"
-                      >✘</button>
+                      <button className={`ch-btn-presence presente ${s.presente===true?'active':''}`}
+                        disabled={isSaving} onClick={() => marcarPresenca(s, true)} title="Presente">
+                        <Check size={16}/>
+                      </button>
+                      <button className={`ch-btn-presence falta ${s.presente===false?'active':''}`}
+                        disabled={isSaving} onClick={() => marcarPresenca(s, false)} title="Falta">
+                        <X size={16}/>
+                      </button>
                     </>
                   )}
-                  <button
-                    className="ch-btn-detail"
-                    onClick={() => setDetailSoldier(s)}
-                    title="Detalhes / Atraso"
-                  >⋮</button>
+                  <button className="ch-btn-detail" onClick={() => setDetailSoldier(s)}>
+                    <MoreVertical size={14}/>
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Rodapé: Ações */}
+        {/* Footer */}
         <div className="ch-footer">
           {!isFinalizada ? (
             <button className="ch-btn-primary ch-btn-enviar" onClick={enviarChamada}>
-              ✅ Finalizar e Enviar Chamada
+              <Send size={15}/> Finalizar e Enviar
             </button>
           ) : (
             <button className="ch-btn-warning ch-btn-enviar" onClick={reabrirChamada}>
-              🔄 Reabrir Chamada
+              <RefreshCw size={15}/> Reabrir Chamada
             </button>
           )}
         </div>
 
-        {/* Modal detalhe soldado */}
         {detailSoldier && (
-          <SoldierDetailModal
-            soldier={detailSoldier}
-            onSave={salvarDetalhes}
-            onClose={() => setDetailSoldier(null)}
-          />
+          <SoldierDetailModal soldier={detailSoldier} onSave={salvarDetalhes} onClose={() => setDetailSoldier(null)}/>
         )}
       </div>
     );
   }
 
-  // ── Render: Listagem de chamadas ──────────────────────────────────────────
+  // ── View: Lista de chamadas ───────────────────────────────────────────────
   return (
     <div className="ch-page">
       <div className="ch-header">
-        <h1 className="ch-title">📋 Sistema de Chamada</h1>
+        <h1 className="ch-title"><ClipboardList size={18}/> Sistema de Chamada</h1>
         <button className="ch-btn-primary" onClick={() => setView('iniciar')}>
-          ▶ Nova Chamada
+          <Plus size={15}/> Nova Chamada
         </button>
       </div>
 
+      {chamadas.length === 0 && (
+        <div className="ch-empty">
+          <Users size={32}/>
+          <span>Nenhuma chamada registrada ainda.</span>
+          <button className="ch-btn-primary" onClick={() => setView('iniciar')}>
+            <Plus size={14}/> Iniciar primeira chamada
+          </button>
+        </div>
+      )}
+
       <div className="ch-chamadas-list">
-        {chamadas.length === 0 && !loading && (
-          <div className="ch-empty">
-            <span>Nenhuma chamada registrada ainda.</span>
-            <button className="ch-btn-primary" onClick={() => setView('iniciar')}>
-              Iniciar primeira chamada
-            </button>
-          </div>
-        )}
         {chamadas.map(c => {
           const turnoLabel = TURNOS.find(t => t.id === c.turno)?.label || c.turno;
           const presente   = c.soldiers.filter(s => s.presente === true).length;
@@ -412,12 +354,14 @@ export default function ChamadaPage() {
                 <span className="ch-chamada-date">{fmtDate(c.date)}</span>
                 <span className="ch-chamada-turno">{turnoLabel}</span>
                 <span className={`ch-status-badge small ${c.status}`}>
-                  {c.status === 'aberta' ? '🟢 Aberta' : c.status === 'enviada' ? '✅ Enviada' : '🔄 Reaberta'}
+                  {c.status === 'enviada' ? <><Check size={10}/> Enviada</> :
+                   c.status === 'reaberta'? <><RefreshCw size={10}/> Reaberta</> :
+                   <><AlertCircle size={10}/> Aberta</>}
                 </span>
               </div>
               <div className="ch-chamada-card-right">
-                <span className="ch-mini-stat green">{presente} ✔</span>
-                <span className="ch-mini-stat red">{falta} ✘</span>
+                <span className="ch-mini-stat green"><Check size={11}/> {presente}</span>
+                <span className="ch-mini-stat red"><X size={11}/> {falta}</span>
               </div>
             </div>
           );

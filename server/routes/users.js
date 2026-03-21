@@ -41,7 +41,7 @@ router.get('/efetivo', protect, adminOnly, async (req, res) => {
 
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { warNumber, warName, nomeCompleto, rank, pelotao, companhia, funcao, situacao, telefone, observacoes } = req.body;
+    const { warNumber, warName, nomeCompleto, rank, pelotao, companhia, funcao, situacao, telefone, observacoes, hasChamadaAccess, hasRelatorioAccess } = req.body;
     const exists = await User.findOne({ warNumber });
     if (exists) return res.status(400).json({ message: 'Número de guerra já cadastrado.' });
     const user = await User.create({
@@ -51,6 +51,8 @@ router.post('/', protect, adminOnly, async (req, res) => {
       pelotao: pelotao || '', companhia: companhia || '',
       funcao: funcao || '', situacao: situacao || 'Ativo',
       telefone: telefone || '', observacoes: observacoes || '',
+      hasChamadaAccess:   Boolean(hasChamadaAccess),
+      hasRelatorioAccess: Boolean(hasRelatorioAccess),
       role: 'soldier', isFirstLogin: true, password: null,
     });
     res.status(201).json(user);
@@ -59,7 +61,7 @@ router.post('/', protect, adminOnly, async (req, res) => {
 
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const fields = ['warName','nomeCompleto','rank','active','pelotao','companhia','funcao','situacao','telefone','observacoes'];
+    const fields = ['warName','nomeCompleto','rank','active','pelotao','companhia','funcao','situacao','telefone','observacoes','hasChamadaAccess','hasRelatorioAccess'];
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'Não encontrado.' });
     fields.forEach(f => {
@@ -67,6 +69,11 @@ router.put('/:id', protect, adminOnly, async (req, res) => {
         user[f] = f === 'warName' ? req.body[f].toUpperCase() : req.body[f];
       }
     });
+    // Admin sempre tem acesso total
+    if (user.role === 'admin') {
+      user.hasChamadaAccess   = true;
+      user.hasRelatorioAccess = true;
+    }
     await user.save();
     res.json(user);
   } catch { res.status(500).json({ message: 'Erro ao atualizar.' }); }

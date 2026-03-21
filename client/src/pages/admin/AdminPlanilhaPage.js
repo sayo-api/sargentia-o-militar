@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  ImageRun, AlignmentType, WidthType, BorderStyle, HeadingLevel } from 'docx';
+  ImageRun, AlignmentType, WidthType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 import toast from 'react-hot-toast';
 import './AdminPages.css';

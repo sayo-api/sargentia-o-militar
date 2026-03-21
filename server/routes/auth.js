@@ -84,6 +84,8 @@ router.post('/login', async (req, res) => {
       role: user.role,
       rank: user.rank,
       isFirstLogin: false,
+      hasChamadaAccess:   user.hasChamadaAccess   || false,
+      hasRelatorioAccess: user.hasRelatorioAccess || false,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -118,6 +120,8 @@ router.post('/set-password', async (req, res) => {
       role: user.role,
       rank: user.rank,
       isFirstLogin: false,
+      hasChamadaAccess:   user.hasChamadaAccess   || false,
+      hasRelatorioAccess: user.hasRelatorioAccess || false,
       token: generateToken(user._id),
     });
   } catch (error) {

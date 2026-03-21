@@ -2,29 +2,40 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import {
+  LayoutGrid, Users, Calendar, FileText, BarChart2,
+  ClipboardList, Shield, BookOpen, Settings, LogOut,
+  Menu, X, Clock, Edit3, Briefcase, Activity,
+  Home, Bell,
+} from 'lucide-react';
+
 import './Layout.css';
 
-const SoldierNav = [
-  { path:'/dashboard', label:'Dashboard', icon:'⬛' },
-  { path:'/avisos',    label:'Avisos',    icon:'📋' },
+const AdminNav = [
+  { section:'COMANDO' },
+  { path:'/admin',            label:'Painel',         icon:<LayoutGrid size={15}/> },
+  { path:'/admin/efetivo',    label:'Parte do Dia',   icon:<Activity size={15}/> },
+  { path:'/admin/rotina',     label:'Rotina',         icon:<Clock size={15}/> },
+  { path:'/admin/ordens',     label:'Ordens do Dia',  icon:<Briefcase size={15}/> },
+  { section:'PESSOAL' },
+  { path:'/admin/usuarios',   label:'Militares',      icon:<Users size={15}/> },
+  { path:'/admin/escalas',    label:'Escalas',        icon:<Calendar size={15}/> },
+  { path:'/admin/historico',  label:'Histórico',      icon:<BookOpen size={15}/> },
+  { path:'/admin/relatorios', label:'Relatórios',     icon:<BarChart2 size={15}/> },
+  { section:'MÓDULOS' },
+  { path:'/chamada',          label:'Chamada',        icon:<ClipboardList size={15}/> },
+  { path:'/auditoria',        label:'Auditoria TFM',  icon:<Shield size={15}/> },
+  { section:'DOCUMENTOS' },
+  { path:'/admin/word',       label:'Editor Word',    icon:<Edit3 size={15}/> },
+  { path:'/admin/planilha',   label:'Planilha',       icon:<FileText size={15}/> },
+  { path:'/admin/boletim',    label:'Boletim',        icon:<FileText size={15}/> },
+  { path:'/admin/avisos',     label:'Avisos',         icon:<Bell size={15}/> },
 ];
 
-const AdminNav = [
-  { section: 'COMANDO' },
-  { path:'/admin',           label:'Painel',        icon:'⬛' },
-  { path:'/admin/efetivo',   label:'Parte do Dia',  icon:'📋' },
-  { path:'/admin/rotina',    label:'Rotina',        icon:'⏰' },
-  { path:'/admin/ordens',    label:'Ordens do Dia', icon:'📌' },
-  { section: 'PESSOAL' },
-  { path:'/admin/usuarios',  label:'Militares',     icon:'🎖' },
-  { path:'/admin/escalas',   label:'Escalas',       icon:'📅' },
-  { path:'/admin/historico', label:'Histórico',     icon:'🗂' },
-  { path:'/admin/relatorios',label:'Relatórios',    icon:'📈' },
-  { section: 'DOCUMENTOS' },
-  { path:'/admin/word',      label:'Editor Word',     icon:'✏️' },
-  { path:'/admin/planilha',  label:'Editor Planilha', icon:'📊' },
-  { path:'/admin/boletim',   label:'Boletim',         icon:'📄' },
-  { path:'/admin/avisos',    label:'Avisos',        icon:'📢' },
+const BaseSoldierNav = [
+  { section:'INÍCIO' },
+  { path:'/dashboard', label:'Dashboard', icon:<Home size={15}/> },
+  { path:'/avisos',    label:'Avisos',    icon:<Bell size={15}/> },
 ];
 
 const RANK_ABBR = {
@@ -36,12 +47,27 @@ const RANK_ABBR = {
 
 export default function Layout({ children, admin }) {
   const { user, logout } = useAuth();
-  const location = useLocation();
+  const location  = useLocation();
   const navigate  = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = (admin || user?.role === 'admin') ? AdminNav : SoldierNav;
+  const isAdmin = admin || user?.role === 'admin';
 
+  const getSoldierNav = () => {
+    const nav = [...BaseSoldierNav];
+    if (user?.hasChamadaAccess || user?.role === 'admin') {
+      nav.push({ section:'MÓDULOS' });
+      nav.push({ path:'/chamada',    label:'Chamada',       icon:<ClipboardList size={15}/> });
+      nav.push({ path:'/auditoria',  label:'Auditoria TFM', icon:<Shield size={15}/> });
+    }
+    if (user?.hasRelatorioAccess || user?.role === 'admin') {
+      if (!nav.find(n => n.section === 'MÓDULOS')) nav.push({ section:'MÓDULOS' });
+      nav.push({ path:'/relatorios', label:'Relatórios',    icon:<BarChart2 size={15}/> });
+    }
+    return nav;
+  };
+
+  const navItems = isAdmin ? AdminNav : getSoldierNav();
   const handleLogout = () => { logout(); toast.success('Sessão encerrada'); navigate('/'); };
 
   return (
@@ -51,12 +77,13 @@ export default function Layout({ children, admin }) {
       <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
-            <div className="logo-emblem">✦</div>
+            <div className="logo-emblem">⚔</div>
             <div className="logo-text">
               <span className="logo-main">SIM</span>
               <span className="logo-sub">Sargentiação Digital</span>
             </div>
           </div>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}><X size={18}/></button>
         </div>
 
         <div className="sidebar-user">
@@ -71,17 +98,18 @@ export default function Layout({ children, admin }) {
         <nav className="sidebar-nav">
           {navItems.map((item, i) => {
             if (item.section) return (
-              <div key={i} style={{ padding:'14px 16px 4px', fontFamily:'var(--font-display)', fontSize:'0.52rem', color:'var(--text-muted)', letterSpacing:'0.12em', textTransform:'uppercase' }}>
-                {item.section}
-              </div>
+              <div key={i} className="nav-section-label">{item.section}</div>
             );
+            const isActive = location.pathname === item.path ||
+              (item.path !== '/' && location.pathname.startsWith(item.path) && item.path.includes('/admin/') && location.pathname.includes('/admin/') && item.path.split('/').length >= location.pathname.split('/').length);
+            const exactActive = location.pathname === item.path;
             return (
               <Link key={item.path} to={item.path}
-                className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+                className={`nav-item ${exactActive ? 'active' : ''}`}
                 onClick={() => setSidebarOpen(false)}>
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>
-                {location.pathname === item.path && <span className="nav-indicator" />}
+                {exactActive && <span className="nav-indicator" />}
               </Link>
             );
           })}
@@ -89,14 +117,16 @@ export default function Layout({ children, admin }) {
 
         <div className="sidebar-footer">
           <button className="logout-btn" onClick={handleLogout}>
-            <span>⏻</span><span>Encerrar Sessão</span>
+            <LogOut size={15}/><span>Encerrar Sessão</span>
           </button>
         </div>
       </aside>
 
       <div className="main-content">
         <header className="topbar">
-          <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>☰</button>
+          <button className="menu-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            <Menu size={20}/>
+          </button>
           <div className="topbar-info">
             <span className="topbar-date">
               {new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}

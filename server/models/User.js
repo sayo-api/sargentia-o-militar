@@ -28,6 +28,9 @@ const userSchema = new mongoose.Schema({
   situacao:    { type: String, enum: SITUACOES, default: 'Ativo' },
   telefone:    { type: String, default: '' },
   observacoes: { type: String, default: '' },
+  // ── Permissões de acesso aos módulos ──────────────────────────────────────
+  hasChamadaAccess:   { type: Boolean, default: false }, // acesso ao sistema de chamada / auditoria
+  hasRelatorioAccess: { type: Boolean, default: false }, // acesso ao painel de relatórios
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

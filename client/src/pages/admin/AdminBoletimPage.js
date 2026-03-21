@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import ExcelJS from 'exceljs';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, AlignmentType, WidthType, BorderStyle, ShadingType,
-  VerticalAlign, HeadingLevel } from 'docx';
+  VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
 import './AdminBoletimPage.css';
 import './responsive.css';

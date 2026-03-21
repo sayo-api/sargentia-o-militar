@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  ImageRun, AlignmentType, WidthType, BorderStyle, HeadingLevel,
-  NumberingConfig, LevelFormat, IndentationLike } from 'docx';
+  ImageRun, AlignmentType, WidthType, BorderStyle } from 'docx';
 import { saveAs } from 'file-saver';
 import toast from 'react-hot-toast';
 import './AdminPages.css';
@@ -104,19 +103,19 @@ export default function AdminWordPage() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [pageOrientation, setPageOrientation] = useState('portrait');
 
-  const exec = useCallback((cmd, val = null) => {
-    editorRef.current?.focus();
-    document.execCommand(cmd, false, val);
-    updateCounts();
-    setSaved(false);
-  }, []);
-
   const updateCounts = useCallback(() => {
     const text = editorRef.current?.innerText || '';
     const words = text.trim().split(/\s+/).filter(Boolean).length;
     setWordCount(words);
     setCharCount(text.length);
   }, []);
+
+  const exec = useCallback((cmd, val = null) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    updateCounts();
+    setSaved(false);
+  }, [updateCounts]);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -135,7 +134,7 @@ export default function AdminWordPage() {
         updateCounts();
       } catch {}
     }
-  }, []);
+  }, [updateCounts]);
 
   // Autosave every 30s
   useEffect(() => {
