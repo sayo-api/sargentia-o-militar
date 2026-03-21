@@ -23,11 +23,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // ══════════════════════════════════════════════════════════════
 //  KEEPALIVE — Impede o Render de desligar o servidor gratuito
-//  O Render free tier desliga após ~15 min de inatividade.
-//  Esta rotina faz um auto-ping a cada 10 minutos.
 // ══════════════════════════════════════════════════════════════
 
-// 1) Endpoint de health-check (também usado por monitores externos)
 app.get('/ping', (req, res) => {
   res.json({
     status:  'online',
@@ -37,9 +34,8 @@ app.get('/ping', (req, res) => {
   });
 });
 
-// 2) Auto-ping interno — dispara após o servidor subir
 const KEEPALIVE_URL  = process.env.KEEPALIVE_URL || 'https://anyprem.store/ping';
-const KEEPALIVE_MS   = 10 * 60 * 1000; // 10 minutos
+const KEEPALIVE_MS   = 10 * 60 * 1000;
 let   keepaliveTimer = null;
 let   pingCount      = 0;
 
@@ -52,7 +48,7 @@ function doPing() {
     pingCount++;
     const ms = Date.now() - startMs;
     console.log(`💓 Keepalive #${pingCount} → ${KEEPALIVE_URL} — ${res.statusCode} (${ms}ms)`);
-    res.resume(); // descarta o corpo
+    res.resume();
   });
 
   req.on('error', (err) => {
@@ -70,7 +66,6 @@ function startKeepalive() {
     console.log('ℹ️  Keepalive desativado em desenvolvimento');
     return;
   }
-  // Aguarda 30s após subir para dar tempo ao servidor inicializar
   setTimeout(() => {
     doPing();
     keepaliveTimer = setInterval(doPing, KEEPALIVE_MS);
@@ -79,15 +74,22 @@ function startKeepalive() {
 }
 
 // Routes
-app.use('/api/auth',      require('./routes/auth'));
-app.use('/api/users',     require('./routes/users'));
-app.use('/api/schedules', require('./routes/schedules'));
-app.use('/api/notices',   require('./routes/notices'));
-app.use('/api/boletins',  require('./routes/boletins'));
-app.use('/api/stats',     require('./routes/stats'));
-app.use('/api/rotina',    require('./routes/rotina'));
-app.use('/api/ai',        require('./routes/ai'));
-app.use('/api/chats',     require('./routes/chats'));
+app.use('/api/auth',       require('./routes/auth'));
+app.use('/api/users',      require('./routes/users'));
+app.use('/api/schedules',  require('./routes/schedules'));
+app.use('/api/planilha',   require('./routes/exportDocx'));  // ← Export DOCX (antes do planilha geral)
+app.use('/api/planilha',   require('./routes/planilha'));    // ← Escala planilha militar
+app.use('/api/notices',    require('./routes/notices'));
+app.use('/api/boletins',   require('./routes/boletins'));
+app.use('/api/stats',      require('./routes/stats'));
+app.use('/api/rotina',     require('./routes/rotina'));
+app.use('/api/ai',         require('./routes/ai'));
+app.use('/api/chats',      require('./routes/chats'));
+// ── NOVOS MÓDULOS ──────────────────────────────────────────────
+app.use('/api/chamada',    require('./routes/chamada'));     // ← Sistema de Chamada
+app.use('/api/auditoria',  require('./routes/auditoria'));   // ← Auditoria TFM / Fardamento
+app.use('/api/permissoes', require('./routes/permissoes'));  // ← Permissões de usuário
+// ───────────────────────────────────────────────────────────────
 
 // Serve static assets in production
 if (process.env.NODE_ENV === 'production') {

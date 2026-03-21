@@ -1,595 +1,1308 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { format, addDays, startOfWeek, endOfWeek } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../context/AuthContext';
-import Calendar from '../../components/Calendar';
 import toast from 'react-hot-toast';
-import ExcelJS from 'exceljs';
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  ImageRun, AlignmentType, WidthType, BorderStyle, ShadingType } from 'docx';
-import { saveAs } from 'file-saver';
 import './AdminPages.css';
-import './responsive.css';
+import './AdminSchedule.css';
 
-const BRASAO_B64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCACoASwDASIAAhEBAxEB/8QAHAABAAMBAQEBAQAAAAAAAAAAAAUGBwQIAwIB/8QATxAAAAQEAwQHBAUHCQYHAAAAAQIDBAAFERIGEyEUIjFBBxUjMkJRYVJicYEkM3KCkRYlNENToaIIRGOSssHR8PEmNXOxwuE2ZHSDk7Pi/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/APZcIQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEIRFOp1L2kx2BwtlnsAwnP3C1raAj5jQf8iEBKwhHFMX7WXogo5UIS/6sniUNxoAcxgO2EczB0m8Zoukq5ahbg/7x0wCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIjBnkk5zdj4v50TlqPPlAdq6iSSJ1VBsIQtxvshFUZ4wEAJtrKpFLu0RHj5FAB4jWocfIecdGKZ2x6oO2avkTqOAs7FQhrS8xNroXQQrw1jPGc1ZPJk+YNXWY4aW55CXbhhruCPmNg6d6oAW0IDSZhiiXJy5RVqte4HcRJYP1ggNtfSsUcyvbLqq9opftCn/ABBNSnw3xjH+kLpDfdZKSvDznZ00z2KOSW3HLcJDAQf1ZAH2d43e7sWLozxDN54zUSfMU0026SbdA+9mOHFvER5VECHNpu3BAaK1nThNqg2VmeQntBcg6hzGucH1TSDXUoUEbPUnlbHzWmDl48UVdZijjNMrZmfVFDvJh5cKfxRmWKnP5UdITHC7Z8om3aHUSzibt7q0RMp8LwDT03eMWxk6UnEnXf8AUfWc9yjSxdsde0rd4SoFU8i1EQG+oUoFpqwFzwlNglrvJWV+hOD9/wDpBoAa+n+eEWN9iuXI1BuCjo9prLd0omAaUqPPn8IwscXsmaK/5QyO+ayxL6dJnS5Ut7S1dIQAQGgX22hwNcXgAjZpWuonIU5oqko4l26Rd7n5u9dQwDXfFMBGhVNTW73dCohp+Hp91m8WbKETIOWVVMhRExrR41/Eg8u96RYow3CuPpajKxxYrtezIK2OkU0ymWLeYCUEK+ZyH3R8ue6OtpYgkKqCblKcy86Z0s0imeWgpjTe48NS/iEBLwjlaPmTu8GzpBezQ+WoBrfjHVAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQjkePmbNLNdOE0A5Xn73w84DrjJFlO2+t+wfu/6Br92u7uiEXB9jBsQB2Jqsvu1vP2Yd6lKd/wDdxEC8a2+fMcdJblnPnbWTpIKJtyKInWPvdtpv18YAI09+p/DSgWLpSn6sjw2plZjdw4VKleTdMkW0RMcPIaBQo+GtxaUMEYrK5xMpGiulJ3KjRRwRMh7LczcLuUHwCN/h8vtRHzzEOIJgtsEzVfPGX1xCHTuUJXUwgPGleRh93SJHqiduFsrqx9mKeDIMXe8z0ARHj5AXX7MB/MPyabzhbKYscxSwpz+yQw1oNRoHnz5BuxpUjaPej/B7uaOpmupMXFzdi2zOzSUHvqBpqIBpWhdRtj79F8lncvZ7A5VTTUeKlOgTLLcka3fOcQ04cte6T4BF4uNMsYYkysPMXbuVSwmztTkT7PTvHE/Cojr/AFIDi6Ky/wC3km/4pv7B41XESaeH8YITTtE5VO7Wj45FLcpwH1KwCHAeVeVLu9FCwTh6ZSfFTGaTNWWt026pjnJ1khmd0Q4Af1jVpx1biSQu5Wr2ibhKy8lq9huJT7gjwGg/KAy7pCw4xOzXUfJrt5q3mn02cptF3JlSiluIW61EezHtBrpdpdQK/I5vN5POGKU46yTkTc9h89NdJM9SkIQbB0ESWAPC73h3aaJLZk5mmG8p85UUcShwVvNWpFN1UxDAKKwiGohUKeyaom8BYznHRMSSd4oqlOJk7ZPO/nqXFOYa3JnAdyo626fd01CpN1FW6yiTZyps7i0h+0tvLcGg+YVH+IY1HoVnzlwzUkz5XM2NIqqB/FbcIWV5AHn4QEYyBRfM7JJLM2e0h/CbLuAdQ9Kcf9YlcPzp9J1lHUsc5ajjcv8AFlqWa+hwOAD8QCA9g9HggIvaj+z3Mu23vf4cOVPOsXCMa6Isag5kKbv9IE5CkdEvtsUIXjTgFQEpvsCX2BjRmOJpW6GwypminNNwFvyu4aD6/uEBEJ+EIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCIPGbcV5GsonXMQ7Uny4+vCvCJyKxjCZJJMxatnCgPK3gQihil08Khw7gDX486DQYDz10tYnmUvnzFrLHOybOTOzu6U5hKe28nkBAHT+k9rWM6YyibThFPYZPMnaahE7Mhoc26Br98aU0AaRs+PJi+keXPpHLJTsahykXe7Dmu0lOG+Jx15Wj4vwr85LMG2JMvbulGZJqKfqSJklxvgA6gf7ojAUZHo7x08Z/SmuyN0z3k252QqfzAB0Hhy8MW2U/m/LSnuOZMplpZJGzFPabDaWhuEARHiFPX5Rck+jfC+cmq+au5mp7bp2cxv3CERuLCyTDaP5nk7Fu9vsQOmgXMu8R68dKgBfUfcgOZ86Slay6TVJd+9USsOjl7qRR72ZTWo6bleW9xEI4nzbMZyZ/OJwm4ZOFSk2JraUrctwhoQNKaeEPMsdsrQ6reJ9RTho42xkY75ZdMpity3DqI6hx5V3hD2RiNazD6YnK8M5DTM3NtXUKVZX5jomHoWAkmMolqcyfKpYZmzuXKJWNewPcQwl3hGtNP4uERbiWsmchQ2pq+aTlR0Ul6iZipkLcPAT6cKc/Le4xLdIGHOq2fWnWbtxmHKiRFS429bvCJxHhoMVeXzybs/qnyiifjRP2qZ/QSDpAWZ05mUnmWwKq9fJ7OXMWQ3liJn5V1EQoIaGqU1eUQWKJHKJgzaOvyvPLMwhkiLHaHMmrwExFLBACH04G/eUIlpLMcxF26w8kg0mKjex0yyymTVL4jpV10/Z/86RxTBtJJeigw27rOXTNuXbiEt7I1oCU4ByOAjeXT3fOApqnRc9eZfUU8kUzTT7hEH28Q3mBB4fCsQy2AMYyfL27Dz5wmmey9BPPNbcPEE76hqP7o/c8lCkrmS8rddoo3PZen3Tl4lOAeQgID846ZPM8SN1k2snmc2zPAigoc38AcYCd6EVOr5w+lbrPTcOG5TkRPum7A1DDrz3wHhG34Vb7XPUE+zy0+1OQhN20O6O9xCtPUKRlPXXSYz2RrM0mjtR4rY1ZPkCGWV9bCagAeZhCNGw9OGzeY7Bmp7awyzzQkruKUhj1EpATrrw3vFT3h0DWoR8Gjhs7RzWypFEx8RBj7wCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQCEIQHM+SUXZqJouDoKHLunDwxlc0+h5+3JKN9nMZZc5zlSTIbUTKCca/GtfejXYxT+U5PCSOTopCyTV6zbOW66wL2GIWzc3LRv4j5cPXQMomXSC+keMJsq6y38mcOFEXTY+8U6JD5RgJrQOID7Oo+Y15sUSNk3ZoYjwy52/DL/6g/ibm8SZ+YCA6f8A640lRPLRU/nGWQ15PCcompoAfHh5h6azfR7P/wAk3i7XZdvkT8ljptvGKqUDAB1A8jgA+l1PgIBISXEM7k/+55m7b+wiRS5M/wBwak/dGqlNNvyqdv0mKczTlCWSfMtKXMDU5wEQ0G8Tn3aRQplh5tL5xJpzJ3W34dfukzoOvYqcLiH8jhr9qg+IBCLcVL/xQ6682BxtCnY93aN5TcGvGvxHnu92A5cQL7PJ0GrVJNvt/wBOXIRO0tomHJT05AGvxGK8aLNPJe5mmME2DZJTtEm5CHy7ikTFIm+PoERM8kz6TrJtXySaaim+nYoU27dSunABgP1NJ9NppmbS+UUTUt7HM7PTu6RHppqKLZSSSiiincITeMf5R1yNs2eTho1cq7O3UVKQ5/vcP+8fefINpXOFEpO+UcJp2nI5IoW670EOFOHygO6ZYeneG8ic5qaeXlnIfMtNmCWtlnGoa/IImipquNrYSeRoL9btyviH3bm+6IGAKhrQ9fs1iExFiyZTxmmwdJIbOnl2dn2lwFoY9fMdfxiVw+XMRw2l1wpKMxJwTOIoUpjlzwtJr5jWA+mF8OSTEGQ6njFRdwzSM0szDFL2ZqlvAOI0UAPuxYp5M5bg+WptZZLENteHsYy9qmUplTeY05B4hioYdnKeG5OuqkkpM1FH+ztSIJm+kKCTdDUKgGgcoi8XTxzgtFd+5VTf4yfpGvW/VsEwKAmInyqACGn3u73w/GLsQOcJ56STpB/jJ+l9Oe/q5anoOSn5DqH9o3IBqvRDMNjxg7fqq5bJRJRVc+ZvEKBQOY4iPMDjT7w+cVr9IeZqquYpvHXOdS4xzAYBqI+ta1+EReX2yeV9ZvX+yQoEIBv4wEID2X0ajt6BZyxc1lqgmty0zFKubuiYSj5W0raHDjQKDfYhMDNAYYJkjTcJkMESUJ3dCBE3AIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAcz1yDRko5OkdTLLdYmFxjfCMX6S5Mpi+WLovnSCji8qrUhyWlKYKgAAIAPEBEn3hjcYquJcPNlEFnTJMU1CFUVOiQN1Uw619D18XqNwGgPGLxs5lbxRq++juG5yk7fslCUMA2H/AHa902hro4mpmyiKaSXaKWJksJ3bhNThzEKAFPQI1PpAxVh/EGD01ZYqxcOL8mx0gQzgiYpH4EHxgNBqUbfe4xkEllz1m8TdJOU8tS4nZqGuVKch/MOAhUkBuuA9il+D02vYO2TwhjuiId05ru+HkclKFH3fmEqsZizxU+26Rbeo/SzWpN3cUHiAAIDrfeHy7oxjOFXLlxOJMwaqqZaj8pPeuPRM4j8SafIfONmfKzKcTieqsezcSh/9BWJ6lodP41IJy+oiXmWA+Dpd9K+rZylmJuGFrF8jmexqQD05HJp8ogp9OH08eJun2XmJksvInbu3Vp8osbd8koz60VfKTOYv1cp1LD7xTpiYbQD2KUqUfDpEW+w8opmKyfMdpp99H+dN/Q5OfxLAQEfoxFU8zslOz3D+56R+rdnW+kpKd/fJ3TfDhpF7xJMvysk7RrLJO7UU3VjnzOzSMFSUOIhQdOdQ5QFEboKOFk2rVLMUUPYQntmGLosqxl+ZtUn6zlzNrsKC27l5wanHUB1E56f9IxyS9s2k+XlKqKOFDlbrzNBO5FkU9bgTHS89AHf8Mfl8dJPPlaU4UUwyz+kLrd6wum4HrXQoeIRE0B24fN1XJ2OU2+muM5wgc6d2VWhKhyvsAP8A5PkOfdJUzSmkhmTVJrmKSx7258y4xynIcCraf0ghdx4ga7WL3K5v15g9Cc7Llqbasjkk8BbbyE+RCEJ8g3YxRGY/n7rR99I2z9KRJ4in+tAnoJO78oDnUN2yiv1adiaO/wDtArp/yu+zFq6HZOxmmKs11sjhNolnZK6lxjmAwAQRAPKtTacRIX0iqS9Nyz/WoOHuz7l6ZbUjDXUK1pz173C2kXfoimThJ2STyPD3W05dqmSvUd5SZEw1rdln04nMNPLdPugIek8CPnOrA5s1uO8iKaFpUuZgEeYDXy4111LFzjjYM2zNEU2yZE67x/eN5iPOOyAQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCARD4qd7HIV1CAcVFOyTsPaa42lQHl5xMRHzWWMpokRJ6mZRNM95QA5i62iXlx0EfxgPEuMGbFniR8lJ3LRw22jNJkKfHc8qkGoGt5fKIwxk3H85zE3FtnhMQ11a/vEfiAxuHSF0AOCKqP8Fus9NQbjslzlIoQwfsh0Tp7hgCmu9yjKvyFxlnKZUsdp5nf7RIqZPURrSv2fSA6uiVntnSFh9JVLMyz3ns7txCifXz30x/GNn6JUk3khmz9XtOs5qs4+7p/fWMY6CV1fywm00+rbyyUOFvrCmKcxKBUBD7Y/jGqyueNsF9D8pV3FHrhIx2qPtmOYT1H3AAQ/cXnAfjEzmUyvGGUxnCDCcpkzr1N1E5h5KDwIpTX2TVC6ldeRw6SbozJXEMsd9cuDlO1c90t1o6gICGnDuiJTV7ukZU6cquFlFXSqjhwoe85/Ecw8x+cXvBeH8bN2earM1MOyr/z28U/wQPoI/IPtQFhmk8cs5bLdhxMu4cKE7ci+9lcuZK8QHndw3dY+symskTnzTbpm+n0qyinOie7cUE1SjTcDhypy7sTTGTy2YIqbM1aKbO4K3Osu0Ilea6hqEIGgfa/qjEY+aOds/wBmXzFg9bqmSOydNCFK4MQ1DWLkCtK8tDfCA5ZSxnbxmpJksxhJnCuaRFTeWOW4OHARDTiahNYoONpi52xSQ7MowZMFTfRj7xjqftFB8YiHd8JQHd8x1eV40bS9bqvE0sUw69U8Z95uqbzzP7zV+1HF0uYVTnktTn0s7R63S8G9tCPHSnEQ4l9rUvswFW6NX2z9HuIFcrM2B0V3Z8S2U/AkZH9Ysp2qaeYT67LtLl6DSnxvCn+Eaf0Rrp5OKGuVtGZLdryf2uT3Q/jp84y5unloqbUqpmf0G8b4CNOH4F1GA/Tj/wBtPf3DkQMYypvTz+NY3f8Ak5SZtI5j1ztDRy5d/QvoqhTFblGg2H55gmAgmLyAKxgjdNXbEMrMdqKHKQnfLvDoUhKUARHyKHPux6J6C+iJs2Zpz7FTGZN5im4vatlF7SkKFBKcaDeOtd1SnAbij3hDfIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAIQhAI+DsypEFDpJgopaNhBPbcbkFeUfeEBn01xhKJ/g+coy5ysxnDVqqrsSwZblJRKp6AHMQEnhrSJXo7xU2xXIwV3U5g3oV0jXum9oPdH/ABDlFN6bcFgvfieXJgcbQB8j7RQ/Wh8A73oFeQ1zbCs4mUknqD+WfpF5UcnwuCiYAyx+I0+dID1PGEzjFUkl8+UYPnKiaiZ+3v8AAYeSh+Q67w+Go+IRGLlPekFufo+PPZH+kHODew/eaqGrW8PSg28h0jBnmHnLxHb0v0hTfyT95X2j/HiPvAVQ3Koh2yWTTaRs8dKzNJNRRRui3QWQQKUrgq6pw3CAAU5bnhMNvx/TrDE3miKE0xg+QwzKm7dNu1RX3lsshaFIQnERHXyNUe7yju6P8UOW7NfDjl8pLHluSxWUQzTEUuECpiAjTQT/ALrNN2KBjyXYkl8yUdYmVUdqKHNkOdrOZNUocvdD0oS2AtDjFuH8HrJpYUwyuo87m2ThMySxzD3bCCTcr50+6NYzeaJdK2NNrnzlWZOG6eZ3HZUkyU7xEyX6hp/rEk3Ve4knDFgk6UcOXBCtEL1CG+yQ561HiOpqxPSmQYtcSGc4cSSUaN37fsJgS1dudQNTAKyNQAFCBYYfhu8oDSv5Pc6TnnRugrmruHDd0i3dHXuuOsQidwiI8a1Aa+vtRkvS9MZvizpCd4XwftzhRg4dHdEIpkFOpnjfxEKgGgV9d31tvQXNWOA8NzaQ4hVy3vXWd2CZlUzpgRIhhAQDzIf8IgcH4fmzjpUnuPGqv5q6yfq5JEzKuHSZzCchATAOYHIPytgI3AfSDi2R7XhzFbFebsk7SZM13jJG8IVPqIezxtpzi/4PnkkeLZuC56vhl6of/dM1uM0VN7hx4CP9f3QigYslE/edZT6etU26e0J3kOuQyyV9QJ2YCIhQAECiYA4e1UQglip5OblKJp2WXnXNaQvyEfwpbpAbRhWXPZf0tfnORKSxOZt1kjkJvNzmtE5ss/kNlbO8WKJg3CqTNHrTEP0eTNzmSIQihymdKAalACo6VAdfTnrE10PzjFoTEjZjN0CYeb/pSzpMyrZqmBa8a6DQKFAo6iYNPFHVPlX2KJkmrlKJypuZQiF9xSnLcJ71NNBy6bneKRP0MMBrHQjLcJuCuJxJpY0zE7SEXy+0SNvAclRqYpuF2uoCHEtom1aPOHRa8ncnxq1YMWx+3VK3dNvCZMvE3luBUSj/ANIxbul3Ht4LYckavDceuSD+KRB/tD93jWgS7XGiE36RRSRepoyOUNVljuDqWJqqXETvE3C0LxAvzNrpFlwzidjiOYuk5Qiuszabijw5bUzKewQB1HTUR08PGsee8NSJ7iOboSxil2inj8KSfM4+gfxaF5x6Vw3J2UhkyErYp0SQL5bxzczD6iOsBKQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCAQhCARifSdgE8rXXnsjTUCXnKYHaCCYZjUpuJ0/c9oOQCPgE1NshAeXW6rnOXftsvZ1EsrZl091wmQvAQJ74CJddy09pgKjUPomhtCK6UozzpqF7eX7pnbcugK5dQosFpADhcFoXFAAMJ9Oxz0bZ6q81wsYGjxQps5neYiavAakEPqz6B6D3dAE1cv2TL/Nb5JdpMW581fPTMVQhridtf5VGhde4B1e9oIfB40luIGae0pNGiadxNxfdSTIXdDluASp/dIiO9cpEJMsNbZPs2cPps79vumWIUlE6UrQaKdnStphKfeGtRlp0vO1EU3XZ7YnafbO6oqUaBRWmojUQAwm3qiG8JRLWOa4jUbrfTklE+yszib26BT2nrzG85D+8ZMN7UwwFpwrhDAsvXbzRLF7pOYNHSK2zOkCNeBwqQa8dK900ZThfoTxb2brrxiwU3SXsVFVVP69CE5eE4xfGryUOEWjVJ0pl7Qnn32mMRO6lbw8iCBOX1QGtCunXLWrZwshszVRNRwRRY+RcU31uUUmhxAKAIH4e9dbAOjlNLC60yYYhkU2n2YfZ9t6tOqoqUTHIqJxER3NwOYmrWKct0ZYgxgiu/6zXlCajizq9RocqOpQEpwAVK0G8A7g6AG8MaCmvMvrUsQz39CTWJ9OV36kE5ACoUp87de8EfFw2cuNkavpnMnGYRuTt3xlSpGE4kOAAPAO5p4awFZ6JujeXYfVnMrxxOJSnL3h2qv0VcxVDFRK4HuHIU4anJyj7zPCWBk3i/5PqTydJpgY96wlTTIXzExClUG2g+x8R1jvKSUJy361BvtDUq31hjGIbtBppWzfAgG9A9dfkbFTFui0+vdqJ29iRTd3MsC0HUBrlANKfrVC89A/Mtw4yTRUdK5bfaG5liHJfaSha6iIDw3xoX9krvaVGblbHrR4fqxJBvshTKulj5STeWqDTfBYQE4UEOCYluMndqBhpTU1ZvMEU2Gam0b3l3z289KiPGmtaG9TRaWbbLlrRq5VTTbpn3Gx0ylRSWCuqgX9oIiB7hNU1Ezl8ZKB3PZ+zk7NSWYVVX7Qljqan3Vly/s0ifqUg8IF/d3jQUgk72dzEkrljbMcKf1Sl9s48iB/netLFhwxg6ZYvWQdMWyjBlYXPcr7xbtQ3NAzBpS7QC1rvRt+E8NyrDMt2aXI0E2qyx9VFTeZh/u4BAc2BsKssKScrRqALuVRvdOTd5U39xQ8If3iIxZoQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEIQgEQ2JcOSXEbTZpuxIuHgP3Tk+yYNQiZhAY5iHoxnbTMVkcyUmad5j5Lpcya+pLPrA0ObgJRNS0xSD4YpM7ScNFT/lLKHTBwoa895LSqqB2m4oGg6iun9lUnsDHpmPmskkoiKaiZDk9kwaQHkaZSqW9hlWOFMopznIoXvcDdylNQEad6gh5xqfQvgeQTfCrt1N2O2Co9MRAx1z3FTAhNNDed8aBNOj/B0wCq0ibp/wDpbkP/AKxLWJmTyxlKJchL5c2Ig3Q7ieo+o6jqI15wGdzro/wc0m+UnLHeXlFNYmuua0wmNzqPHT8IlsP9G+CurWrnqcFFVEi3nUXVNvU10E+mtdIs86kTKbrEVchvpkMQDAmQw2mpUN4B8ok0E00kSJphaQhbS/CA8u9I+HpbL8dzVqk2sTTVKchMw1pSnIQ+nprT5REs02LdZPNap7PmlzCE3c0t28HzDSPTOIMFYbn8xI+mcuFVwQtl5Fzp3F9bBCsd0mw9JZPrLZS0aqDxUImF5vibiMBhzLB2I8RpJg2lqjdMT3ncuk8hNUwlqc9ghfqcTiW0OFl3cLGh4b6MZUzAF544UnLi68U1AtbAalK5fjGmlTVr5RokID8FKBAy0wAsfuEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEIBCEID//Z';
+// ─── Constantes ───────────────────────────────────────────────────────────────
 
-const DEFAULT_DUTIES = ['Sgt do Dia','Cb Gda','Cb do Dia','Cb Hipismo','Plantão','Esf Vet','Perm. Equoterapia','Partão B','Pelotão de Higiene'];
+const MESES = [
+  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
+];
 
-export default function AdminSchedulePage() {
-  const [users, setUsers] = useState([]);
-  const [schedules, setSchedules] = useState([]);
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [selectedSchedule, setSelectedSchedule] = useState(null);
-  const [selectedSoldiers, setSelectedSoldiers] = useState([]);
-  const [notes, setNotes] = useState('');
-  const [dutyTypes, setDutyTypes] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [conflicts, setConflicts] = useState([]);
-  const [showAutoModal, setShowAutoModal] = useState(false);
-  const [autoWeekStart, setAutoWeekStart] = useState('');
-  const [autoDuties, setAutoDuties] = useState(DEFAULT_DUTIES.slice(0,5));
-  const [serviceStats, setServiceStats] = useState({});
-  const [activeTab, setActiveTab] = useState('manual');
+const DIAS_SEMANA_ABREV = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
-  const now = new Date();
+const DEFAULT_DUTIES = [
+  { id: 'd1', name: 'Sgt do Dia',         abbreviation: 'SGT DIA', order: 0 },
+  { id: 'd2', name: 'Cb Gda',             abbreviation: 'CB GDA',  order: 1 },
+  { id: 'd3', name: 'Cb do Dia',          abbreviation: 'CB DIA',  order: 2 },
+  { id: 'd4', name: 'Cb Hipismo',         abbreviation: 'CB HIP',  order: 3 },
+  { id: 'd5', name: 'Plantão',            abbreviation: 'PLANT.',  order: 4 },
+  { id: 'd6', name: 'Esf. Vet.',          abbreviation: 'ESF VET', order: 5 },
+  { id: 'd7', name: 'Perm. Equoterapia',  abbreviation: 'EQT.',    order: 6 },
+  { id: 'd8', name: 'Partão B',           abbreviation: 'PT B',    order: 7 },
+  { id: 'd9', name: 'Pelotão de Higiene', abbreviation: 'PL HIG',  order: 8 },
+];
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [usersRes, schedRes] = await Promise.all([
-          api.get('/users'),
-          api.get(`/schedules?month=${now.getMonth()+1}&year=${now.getFullYear()}`),
-        ]);
-        setUsers(usersRes.data);
-        setSchedules(schedRes.data);
-        // Get service stats
-        try {
-          const rankRes = await api.get('/stats/ranking?days=30');
-          const map = {};
-          rankRes.data.forEach(r => { map[r.user._id] = r.recent; });
-          setServiceStats(map);
-        } catch {}
-      } catch { toast.error('Erro ao carregar dados'); }
-      finally { setLoading(false); }
-    };
-    fetchData();
-    // Default auto week = next Monday
-    const d = new Date();
-    const day = d.getDay();
-    d.setDate(d.getDate() + (day === 0 ? 1 : 8 - day));
-    setAutoWeekStart(format(d,'yyyy-MM-dd'));
-  }, []); // eslint-disable-line
+// Estes são os status padrão do sistema (sempre presentes, não podem ser deletados)
+const BUILT_IN_STATUS_KEYS = [
+  'ativo','baixado','folga','ferias','hospitalar','desertor','luto','ausente','missao',
+];
 
-  const checkConflicts = useCallback((soldiers) => {
-    const seen = {};
-    const conf = [];
-    soldiers.forEach(id => {
-      if (seen[id]) conf.push(id);
-      else seen[id] = true;
-    });
-    setConflicts(conf);
-  }, []);
+const DEFAULT_STATUS_COLORS = {
+  ativo:      { label: 'Ativo / Serviço',       bgColor: '#16a34a', textColor: '#ffffff', builtIn: true },
+  baixado:    { label: 'Baixado',               bgColor: '#dc2626', textColor: '#ffffff', builtIn: true },
+  folga:      { label: 'Folga / Dispensa',      bgColor: '#d97706', textColor: '#ffffff', builtIn: true },
+  ferias:     { label: 'Férias',                bgColor: '#2563eb', textColor: '#ffffff', builtIn: true },
+  hospitalar: { label: 'Internação Hospitalar', bgColor: '#db2777', textColor: '#ffffff', builtIn: true },
+  desertor:   { label: 'Desertor',              bgColor: '#1f2937', textColor: '#ffffff', builtIn: true },
+  luto:       { label: 'Luto',                  bgColor: '#6b7280', textColor: '#ffffff', builtIn: true },
+  ausente:    { label: 'Ausente s/ justif.',    bgColor: '#ea580c', textColor: '#ffffff', builtIn: true },
+  missao:     { label: 'Missão Especial',       bgColor: '#7c3aed', textColor: '#ffffff', builtIn: true },
+};
 
-  const handleDayClick = (day, schedule) => {
-    setSelectedDay(day);
-    setSelectedSchedule(schedule || null);
-    if (schedule) {
-      const soldierIds = schedule.soldiers.map(s => s.user?._id || s.user);
-      setSelectedSoldiers(soldierIds);
-      const duties = {};
-      schedule.soldiers.forEach(s => { duties[s.user?._id || s.user] = s.duty; });
-      setDutyTypes(duties);
-      setNotes(schedule.notes || '');
-      checkConflicts(soldierIds);
-    } else {
-      setSelectedSoldiers([]); setDutyTypes({}); setNotes(''); setConflicts([]);
-    }
-  };
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  const toggleSoldier = (userId) => {
-    const newList = selectedSoldiers.includes(userId)
-      ? selectedSoldiers.filter(id => id !== userId)
-      : [...selectedSoldiers, userId];
-    setSelectedSoldiers(newList);
-    if (!dutyTypes[userId]) setDutyTypes(prev => ({ ...prev, [userId]: 'Serviço' }));
-    checkConflicts(newList);
-  };
+function daysInMonth(month, year) { return new Date(year, month, 0).getDate(); }
+function getDayOfWeek(d, m, y)   { return new Date(y, m - 1, d).getDay(); }
+function makeCellKey(day, dutyId){ return `${day}-${dutyId}`; }
+function genId() { return 'sc_' + Math.random().toString(36).slice(2, 9); }
 
-  const handleSave = async () => {
-    if (!selectedDay) { toast.error('Selecione um dia no calendário'); return; }
-    if (conflicts.length > 0) {
-      const ok = window.confirm('Existem militares duplicados na escala. Deseja salvar mesmo assim?');
-      if (!ok) return;
-    }
-    setSaving(true);
-    try {
-      const soldiers = selectedSoldiers.map(id => ({ user: id, duty: dutyTypes[id] || 'Serviço' }));
-      const res = await api.post('/schedules', { date: selectedDay.toISOString(), soldiers, notes });
-      const dateStr = selectedDay.toDateString();
-      setSchedules(prev => {
-        const idx = prev.findIndex(s => new Date(s.date).toDateString() === dateStr);
-        if (idx >= 0) { const u = [...prev]; u[idx] = res.data; return u; }
-        return [...prev, res.data];
-      });
-      setSelectedSchedule(res.data);
-      toast.success('Escala salva com sucesso');
-    } catch { toast.error('Erro ao salvar escala'); }
-    finally { setSaving(false); }
-  };
+// Normaliza o objeto statusColors vindo da API (pode ser Map serializado)
+function normalizeStatusColors(raw) {
+  if (!raw) return { ...DEFAULT_STATUS_COLORS };
+  const entries = raw instanceof Map
+    ? Array.from(raw.entries())
+    : Object.entries(raw);
+  const merged = { ...DEFAULT_STATUS_COLORS };
+  entries.forEach(([k, v]) => {
+    merged[k] = { ...v };
+    if (BUILT_IN_STATUS_KEYS.includes(k)) merged[k].builtIn = true;
+  });
+  return merged;
+}
 
-  const handleDeleteSchedule = async () => {
-    if (!selectedSchedule) return;
-    if (!window.confirm('Remover esta escala?')) return;
-    try {
-      await api.delete(`/schedules/${selectedSchedule._id}`);
-      const dateStr = selectedDay.toDateString();
-      setSchedules(prev => prev.filter(s => new Date(s.date).toDateString() !== dateStr));
-      setSelectedSchedule(null); setSelectedSoldiers([]); setNotes(''); setConflicts([]);
-      toast.success('Escala removida');
-    } catch { toast.error('Erro ao remover'); }
-  };
+// ─── Componente: Chip de status ───────────────────────────────────────────────
 
-  const handleAutoGenerate = async () => {
-    if (!autoWeekStart) { toast.error('Selecione a semana'); return; }
-    setGenerating(true);
-    try {
-      const res = await api.post('/stats/auto-generate', {
-        weekStart: autoWeekStart,
-        duties: autoDuties.filter(Boolean),
-        includeSunday: false,
-      });
-      toast.success(`✓ ${res.data.count} dias gerados automaticamente!`);
-      setShowAutoModal(false);
-      // Reload schedules
-      const schedRes = await api.get(`/schedules?month=${now.getMonth()+1}&year=${now.getFullYear()}`);
-      setSchedules(schedRes.data);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Erro ao gerar escala');
-    } finally { setGenerating(false); }
-  };
+function StatusChip({ statusKey, statusColors, active, onClick, size = 'md' }) {
+  const c = statusColors[statusKey] || DEFAULT_STATUS_COLORS[statusKey] || { bgColor: '#374151', textColor: '#fff', label: statusKey };
+  return (
+    <button
+      className={`sc-status-btn sc-status-btn--${size} ${active ? 'active' : ''}`}
+      style={{ '--sc-bg': c.bgColor, '--sc-text': c.textColor }}
+      onClick={onClick}
+      title={c.label}
+    >
+      {c.label}
+    </button>
+  );
+}
 
-  // ── Export Excel da Escala Semanal ──────────────────────────────────────────
-  const exportEscalaExcel = async () => {
-    try {
-      const wb = new ExcelJS.Workbook();
-      const now = new Date();
-      const monday = addDays(startOfWeek(now, { weekStartsOn: 1 }), 0);
-      const ws = wb.addWorksheet('Escala Semanal', { pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true } });
+// ─── Modal: Editar Célula Individual ─────────────────────────────────────────
 
-      // Title
-      ws.mergeCells('A1:H1');
-      ws.getCell('A1').value = 'ESCALA DE SERVIÇO SEMANAL';
-      ws.getCell('A1').font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
-      ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a2e12' } };
-      ws.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-      ws.getRow(1).height = 28;
+function CellEditModal({ cell, duty, day, month, year, users, statusColors, onSave, onClear, onClose }) {
+  const [userId,      setUserId]      = useState(cell?.user?._id || cell?.user || '');
+  const [status,      setStatus]      = useState(cell?.status   || 'ativo');
+  const [reason,      setReason]      = useState(cell?.reason   || '');
+  const [notes,       setNotes]       = useState(cell?.notes    || '');
+  const [customColor, setCustomColor] = useState(cell?.customColor || '');
+  const [search,      setSearch]      = useState('');
 
-      ws.mergeCells('A2:H2');
-      ws.getCell('A2').value = `Semana de ${monday.toLocaleDateString('pt-BR')} a ${addDays(monday, 6).toLocaleDateString('pt-BR')} — Gerado em: ${now.toLocaleString('pt-BR')}`;
-      ws.getCell('A2').font = { name: 'Arial', size: 9, italic: true };
-      ws.getCell('A2').alignment = { horizontal: 'center' };
-      ws.getRow(2).height = 16;
+  const dateLabel = `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
+  const weekDay   = DIAS_SEMANA_ABREV[getDayOfWeek(day, month, year)];
+  const filtered  = users.filter(u =>
+    !search ||
+    u.warName?.toLowerCase().includes(search.toLowerCase()) ||
+    u.warNumber?.toString().includes(search) ||
+    u.rank?.toLowerCase().includes(search.toLowerCase())
+  );
 
-      // Headers
-      const headers = ['Dia', 'Data', 'Militar', 'Posto/Grad.', 'Nº de Guerra', 'Nº', 'Tipo de Serviço', 'Observações'];
-      const widths =  [16,    12,    20,         18,            14,             8,    22,                28];
-      headers.forEach((h, i) => {
-        const col = ws.getColumn(i + 1);
-        col.width = widths[i];
-        const cell = ws.getRow(3).getCell(i + 1);
-        cell.value = h;
-        cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFFFFFFF' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2a4020' } };
-        cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        cell.border = { bottom: { style: 'medium', color: { argb: 'FF6b7c5e' } }, right: { style: 'thin', color: { argb: 'FF3a5a2a' } } };
-      });
-      ws.getRow(3).height = 20;
-
-      const DAYS_PT = ['Domingo','Segunda-Feira','Terça-Feira','Quarta-Feira','Quinta-Feira','Sexta-Feira','Sábado'];
-      let rowIdx = 4;
-
-      for (let d = 0; d < 7; d++) {
-        const day = addDays(monday, d);
-        const dayStr = day.toDateString();
-        const sched = schedules.find(s => new Date(s.date).toDateString() === dayStr);
-        const dayName = DAYS_PT[day.getDay()];
-        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
-        const fillColor = isWeekend ? 'FFEEEEEE' : (d % 2 === 0 ? 'FFF4F2EA' : 'FFFFFFFF');
-
-        if (sched && sched.soldiers.length > 0) {
-          sched.soldiers.forEach((s, si) => {
-            const row = ws.getRow(rowIdx++);
-            row.values = [
-              si === 0 ? dayName : '',
-              si === 0 ? day.toLocaleDateString('pt-BR') : '',
-              s.user?.warName || '—',
-              s.user?.rank || '—',
-              s.user?.warNumber || '—',
-              si + 1,
-              s.duty || 'Serviço',
-              si === 0 ? (sched.notes || '') : '',
-            ];
-            row.eachCell(cell => {
-              cell.font = { name: 'Arial', size: 9 };
-              cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
-              cell.border = {
-                top: { style: 'hair', color: { argb: 'FFCCCCCC' } },
-                bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } },
-                left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
-                right: { style: 'thin', color: { argb: 'FFCCCCCC' } },
-              };
-              cell.alignment = { vertical: 'middle', wrapText: false };
-            });
-            row.height = 18;
-          });
-        } else {
-          const row = ws.getRow(rowIdx++);
-          row.values = [dayName, day.toLocaleDateString('pt-BR'), '—', '', '', '', 'Sem escala', ''];
-          row.eachCell(cell => {
-            cell.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF888888' } };
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
-            cell.border = { top: { style: 'hair', color: { argb: 'FFCCCCCC' } }, bottom: { style: 'hair', color: { argb: 'FFCCCCCC' } } };
-          });
-          row.height = 18;
-        }
-      }
-
-      ws.views = [{ state: 'frozen', ySplit: 3 }];
-      const buf = await wb.xlsx.writeBuffer();
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url;
-      a.download = `escala_${monday.toISOString().slice(0,10)}.xlsx`; a.click();
-      URL.revokeObjectURL(url);
-      toast.success('✓ Planilha da escala exportada!');
-    } catch (err) { console.error(err); toast.error('Erro ao exportar Excel'); }
-  };
-
-  // ── Export Word da Escala (A4 para impressão) ─────────────────────────────
-  const exportEscalaWord = async () => {
-    try {
-      const binary = atob(BRASAO_B64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
-      const now = new Date();
-      const monday = addDays(startOfWeek(now, { weekStartsOn: 1 }), 0);
-      const DAYS_PT = ['Domingo','Segunda-Feira','Terça-Feira','Quarta-Feira','Quinta-Feira','Sexta-Feira','Sábado'];
-      const bold = (t, sz=20) => new TextRun({ text: t, bold: true, font: 'Times New Roman', size: sz });
-      const norm = (t, sz=20) => new TextRun({ text: t, font: 'Times New Roman', size: sz });
-
-      const children = [];
-
-      // Brasão + cabeçalho
-      children.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [new ImageRun({ data: bytes, transformation: { width: 70, height: 70 }, type: 'jpg' })],
-        spacing: { after: 60 },
-      }));
-      ['MINISTÉRIO DA DEFESA','EXÉRCITO BRASILEIRO','COMANDO MILITAR DO PLANALTO'].forEach(line => {
-        children.push(new Paragraph({ alignment: AlignmentType.CENTER, children: [bold(line, 20)], spacing: { after: 30 } }));
-      });
-      children.push(new Paragraph({
-        alignment: AlignmentType.CENTER,
-        border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '2a4020', space: 1 } },
-        children: [bold(`ESCALA DE SERVIÇO — ${monday.toLocaleDateString('pt-BR')} A ${addDays(monday,6).toLocaleDateString('pt-BR')}`, 22)],
-        spacing: { before: 120, after: 160 },
-      }));
-
-      for (let d = 0; d < 7; d++) {
-        const day = addDays(monday, d);
-        const dayStr = day.toDateString();
-        const sched = schedules.find(s => new Date(s.date).toDateString() === dayStr);
-        const dayName = DAYS_PT[day.getDay()];
-
-        children.push(new Paragraph({
-          shading: { fill: 'E8E4D0', type: ShadingType.CLEAR },
-          children: [bold(`${dayName.toUpperCase()} — ${day.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' }).toUpperCase()}`, 20)],
-          spacing: { before: 160, after: 60 },
-        }));
-
-        const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' };
-        const borders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
-
-        if (sched && sched.soldiers.length > 0) {
-          const rows = sched.soldiers.map(s => new TableRow({
-            children: [
-              new TableCell({
-                width: { size: 3000, type: WidthType.DXA }, borders,
-                margins: { top: 60, bottom: 60, left: 100, right: 100 },
-                children: [new Paragraph({ children: [bold(s.duty || 'Serviço', 18)], spacing: { after: 0 } })],
-              }),
-              new TableCell({
-                width: { size: 5640, type: WidthType.DXA }, borders,
-                margins: { top: 60, bottom: 60, left: 100, right: 100 },
-                children: [new Paragraph({ children: [norm(`${s.user?.rank || ''} ${s.user?.warName || '—'}`, 18)], spacing: { after: 0 } })],
-              }),
-            ],
-          }));
-          children.push(new Table({ width: { size: 8640, type: WidthType.DXA }, columnWidths: [3000, 5640], rows }));
-        } else {
-          children.push(new Paragraph({
-            children: [new TextRun({ text: 'Sem escala definida para este dia.', italics: true, font: 'Times New Roman', size: 18, color: '888888' })],
-            spacing: { after: 60 },
-          }));
-        }
-        if (sched?.notes) {
-          children.push(new Paragraph({ children: [norm(`Obs: ${sched.notes}`, 18)], spacing: { before: 40, after: 20 } }));
-        }
-      }
-
-      const doc = new Document({
-        sections: [{
-          properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1000, right: 1000, bottom: 1000, left: 1000 } } },
-          children,
-        }],
-      });
-      const blob = await Packer.toBlob(doc);
-      saveAs(blob, `escala_${monday.toISOString().slice(0,10)}.docx`);
-      toast.success('✓ Word da escala gerado!');
-    } catch (err) { console.error(err); toast.error('Erro ao gerar Word'); }
-  };
-
-  if (loading) return <div className="loading-center"><div className="spinner" /></div>;
+  const allStatuses = Object.entries(statusColors);
 
   return (
-    <div className="page-container fade-in">
-      <div className="page-header">
-        <h1 className="page-title">📅 <span>Gestão</span> de Escalas</h1>
-        <div style={{ display:'flex',gap:8,alignItems:'center' }}>
-          <div style={{ display:'flex',alignItems:'center',gap:8 }}>
-            <span className="admin-date">{format(now,'MMMM yyyy',{locale:ptBR}).toUpperCase()}</span>
-            <button className="btn btn-outline btn-sm" onClick={exportEscalaExcel}>📊 Excel</button>
-            <button className="btn btn-outline btn-sm" onClick={exportEscalaWord}>📄 Word A4</button>
-          </div>
-          <button className="btn btn-primary" onClick={() => setShowAutoModal(true)}>
-            ⚡ Geração Automática Inteligente
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display:'flex',gap:2,marginBottom:18,background:'var(--bg-dark)',border:'1px solid var(--border)',borderRadius:6,padding:3,width:'fit-content' }}>
-        {[{id:'manual',label:'📅 Escala Manual'},{id:'semana',label:'📋 Visão Semanal'}].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)}
-            style={{ padding:'6px 16px',borderRadius:4,border:'none',cursor:'pointer',fontFamily:'var(--font-display)',fontSize:'0.6rem',letterSpacing:'0.07em',textTransform:'uppercase',transition:'all .15s',
-              background:activeTab===t.id?'var(--accent)':'transparent',
-              color:activeTab===t.id?'var(--bg-dark)':'var(--text-muted)',fontWeight:activeTab===t.id?700:'normal' }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {activeTab === 'manual' && (
-        <div className="schedule-admin-layout">
+    <div className="sc-modal-overlay" onClick={onClose}>
+      <div className="sc-modal" onClick={e => e.stopPropagation()}>
+        <div className="sc-modal-header">
           <div>
-            <Calendar schedules={schedules} onDayClick={handleDayClick} selectedDate={selectedDay} />
+            <div className="sc-modal-title">✏️ Editar Célula</div>
+            <div className="sc-modal-subtitle">{duty?.name} — {weekDay} {dateLabel}</div>
+          </div>
+          <button className="sc-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="sc-modal-body">
+          <label className="sc-label">Soldado</label>
+          <input className="sc-input" placeholder="Buscar por nome, Nr. ou posto..."
+            value={search} onChange={e => setSearch(e.target.value)} />
+          <div className="sc-soldier-list">
+            <div className={`sc-soldier-item ${!userId ? 'selected' : ''}`} onClick={() => setUserId('')}>
+              <span className="sc-badge-empty">–</span><span>Nenhum (vazio)</span>
+            </div>
+            {filtered.map(u => (
+              <div key={u._id} className={`sc-soldier-item ${userId === u._id ? 'selected' : ''}`}
+                onClick={() => setUserId(u._id)}>
+                <span className="sc-badge-rank">{u.rank?.slice(0,3)}</span>
+                <span className="sc-soldier-name">{u.warName}</span>
+                <span className="sc-soldier-nr">Nr {u.warNumber}</span>
+              </div>
+            ))}
           </div>
 
-          <div className="schedule-form-card">
-            {!selectedDay ? (
-              <div className="empty-state">
-                <div className="empty-state-icon">📅</div>
-                <p className="empty-state-text">Selecione um dia no calendário</p>
-              </div>
-            ) : (
-              <>
-                <h3 className="schedule-form-title">
-                  {format(selectedDay,"EEEE, dd 'de' MMMM",{locale:ptBR}).toUpperCase()}
-                  {selectedSchedule && <span className="badge badge-success" style={{ marginLeft:8,fontSize:'0.6rem' }}>DEFINIDA</span>}
-                </h3>
+          <label className="sc-label">Status</label>
+          <div className="sc-status-grid">
+            {allStatuses.map(([key, val]) => (
+              <StatusChip key={key} statusKey={key} statusColors={statusColors}
+                active={status === key} onClick={() => setStatus(key)} size="sm" />
+            ))}
+          </div>
 
-                {/* Conflict warning */}
-                {conflicts.length > 0 && (
-                  <div style={{ background:'rgba(231,76,60,.12)',border:'1px solid #c0392b',borderRadius:4,padding:'8px 12px',marginBottom:12,fontSize:'0.75rem',color:'#e74c3c' }}>
-                    ⚠ <strong>Conflito detectado:</strong> {conflicts.map(id => {
-                      const u = users.find(us => us._id === id);
-                      return u ? u.warName : id;
-                    }).join(', ')} aparecem mais de uma vez.
-                  </div>
-                )}
+          {status !== 'ativo' && (
+            <>
+              <label className="sc-label">Motivo / Diagnóstico</label>
+              <input className="sc-input"
+                placeholder="Ex: Dengue hemorrágica, Licença maternidade, Deserção..."
+                value={reason} onChange={e => setReason(e.target.value)} />
+            </>
+          )}
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Selecionar Militares ({selectedSoldiers.length} selecionados)
-                    <span style={{ marginLeft:8,fontSize:'0.62rem',color:'var(--text-muted)' }}>— ordenados por menos serviços recentes</span>
-                  </label>
-                  <div className="soldier-select-list">
-                    {[...users.filter(u => u.active)].sort((a,b) => {
-                      const as = serviceStats[a._id] || 0;
-                      const bs = serviceStats[b._id] || 0;
-                      return as - bs; // fewer services first
-                    }).map(u => {
-                      const isSelected = selectedSoldiers.includes(u._id);
-                      const svcCount = serviceStats[u._id] || 0;
-                      return (
-                        <div key={u._id}
-                          className={`soldier-select-item ${isSelected?'selected':''}`}
-                          onClick={() => toggleSoldier(u._id)}
-                        >
-                          <div className="soldier-select-checkbox">{isSelected&&'✓'}</div>
-                          <span className="soldier-rank-badge" style={{ fontSize:'0.58rem' }}>{u.rank.split(' ')[0]}</span>
-                          <span className="admin-soldier-name" style={{ flex:1 }}>{u.warName}</span>
-                          <span style={{ fontFamily:'var(--font-mono)',fontSize:'0.58rem',color:svcCount===0?'#e6a23c':'var(--text-muted)' }}>
-                            {svcCount} serv.
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+          <label className="sc-label">Observações</label>
+          <input className="sc-input" placeholder="Obs. adicionais..."
+            value={notes} onChange={e => setNotes(e.target.value)} />
 
-                {selectedSoldiers.length > 0 && (
-                  <div className="form-group">
-                    <label className="form-label">Função/Tipo de Serviço por Militar</label>
-                    {selectedSoldiers.map(id => {
-                      const u = users.find(us => us._id === id);
-                      const isConflict = conflicts.includes(id);
-                      return u ? (
-                        <div key={id} style={{ display:'flex',gap:8,marginBottom:6,alignItems:'center' }}>
-                          <span style={{ flex:1,fontFamily:'var(--font-display)',fontSize:'0.72rem',letterSpacing:'0.05em',color:isConflict?'#e74c3c':'var(--text-secondary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
-                            {isConflict && '⚠ '}{u.warName}
-                          </span>
-                          <input type="text" className="form-control"
-                            style={{ maxWidth:160,padding:'6px 10px',fontSize:'0.78rem',borderColor:isConflict?'#c0392b':undefined }}
-                            value={dutyTypes[id]||'Serviço'}
-                            onChange={e => setDutyTypes(prev => ({...prev,[id]:e.target.value}))}
-                            list="duty-suggestions"
-                            placeholder="Tipo de serviço"
-                          />
-                        </div>
-                      ) : null;
-                    })}
-                    <datalist id="duty-suggestions">
-                      {DEFAULT_DUTIES.map((d,i) => <option key={i} value={d} />)}
-                    </datalist>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label">Observações</label>
-                  <textarea className="form-control" value={notes}
-                    onChange={e => setNotes(e.target.value)}
-                    placeholder="Observações sobre a escala..." style={{ minHeight:60 }} />
-                </div>
-
-                <div style={{ display:'flex',gap:8 }}>
-                  <button className="btn btn-primary" style={{ flex:1 }} onClick={handleSave} disabled={saving}>
-                    {saving ? <span className="spinner" style={{ width:16,height:16 }} /> : selectedSchedule?'Atualizar Escala':'Salvar Escala'}
-                  </button>
-                  {selectedSchedule && (
-                    <button className="btn btn-danger btn-sm" onClick={handleDeleteSchedule} title="Remover">🗑</button>
-                  )}
-                </div>
-              </>
-            )}
+          <label className="sc-label">Cor personalizada (opcional)</label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input type="color" value={customColor || statusColors[status]?.bgColor || '#22c55e'}
+              onChange={e => setCustomColor(e.target.value)}
+              style={{ width: 40, height: 36, padding: 2, borderRadius: 4, border: '1px solid #374151', cursor: 'pointer' }} />
+            {customColor && <button className="sc-btn-ghost" onClick={() => setCustomColor('')}>Usar padrão do status</button>}
           </div>
         </div>
-      )}
 
-      {activeTab === 'semana' && (
-        <WeekView schedules={schedules} users={users} serviceStats={serviceStats} />
-      )}
-
-      {/* Auto-generate modal */}
-      {showAutoModal && (
-        <div className="modal-overlay" onClick={() => setShowAutoModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth:500 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">⚡ Geração Automática Inteligente</h3>
-              <button className="modal-close" onClick={() => setShowAutoModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ background:'rgba(107,124,94,.12)',border:'1px solid var(--accent-dark)',borderRadius:4,padding:'10px 14px',marginBottom:14,fontSize:'0.76rem',color:'var(--text-secondary)',lineHeight:1.6 }}>
-                ℹ O sistema distribui militares automaticamente priorizando:<br/>
-                • Quem está há <strong>mais tempo sem serviço</strong><br/>
-                • Evita escalar o mesmo militar em <strong>dias consecutivos</strong><br/>
-                • Respeita o <strong>histórico de serviços</strong> para distribuição justa
-              </div>
-              <div className="form-group" style={{ marginBottom:14 }}>
-                <label className="form-label">Semana a gerar (início — Segunda-feira)</label>
-                <input type="date" className="form-control" value={autoWeekStart}
-                  onChange={e => setAutoWeekStart(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">
-                  Funções/Posições a preencher (uma por linha)
-                  <button className="btn btn-ghost btn-sm" style={{ marginLeft:8 }}
-                    onClick={() => setAutoDuties(DEFAULT_DUTIES.slice(0,5))}>
-                    Padrão
-                  </button>
-                </label>
-                <textarea className="form-control"
-                  value={autoDuties.join('\n')}
-                  onChange={e => setAutoDuties(e.target.value.split('\n'))}
-                  style={{ minHeight:120,fontFamily:'var(--font-mono)',fontSize:'0.75rem' }}
-                  placeholder="Sgt do Dia&#10;Cb Gda&#10;Cb do Dia&#10;..." />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setShowAutoModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleAutoGenerate} disabled={generating}>
-                {generating ? <><span className="spinner" style={{ width:14,height:14 }} /> Gerando...</> : '⚡ Gerar Escala Semanal'}
-              </button>
-            </div>
+        <div className="sc-modal-footer">
+          {cell && <button className="sc-btn-danger" onClick={() => onClear(day, duty.id)}>🗑 Limpar</button>}
+          <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+            <button className="sc-btn-ghost" onClick={onClose}>Cancelar</button>
+            <button className="sc-btn-primary"
+              onClick={() => onSave({ day, dutyId: duty.id, user: userId||null, status, reason, notes, customColor, manualOverride: true })}>
+              ✔ Salvar
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function WeekView({ schedules, users, serviceStats }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const now = new Date();
-  const monday = addDays(startOfWeek(now, { weekStartsOn: 1 }), weekOffset * 7);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+// ─── Modal: Aplicação em Lote (NOVO) ─────────────────────────────────────────
 
-  const getScheduleForDay = (day) =>
-    schedules.find(s => {
-      const d = new Date(s.date);
-      return d.getDate() === day.getDate() && d.getMonth() === day.getMonth() && d.getFullYear() === day.getFullYear();
-    });
+function RangeApplyModal({ totalDays, month, year, users, duties, cells, statusColors, onApply, onClose }) {
+  const [soldierIds,  setSoldierIds]  = useState([]);
+  const [dayFrom,     setDayFrom]     = useState(1);
+  const [dayTo,       setDayTo]       = useState(Math.min(8, totalDays));
+  const [status,      setStatus]      = useState('baixado');
+  const [reason,      setReason]      = useState('');
+  const [notes,       setNotes]       = useState('');
+  const [customColor, setCustomColor] = useState('');
+  const [targetDuties,setTargetDuties]= useState('assigned'); // 'assigned' | 'all' | string[] (specific ids)
+  const [dutyScope,   setDutyScope]   = useState('assigned');
+  const [search,      setSearch]      = useState('');
+
+  const allStatuses = Object.entries(statusColors);
+
+  const toggleSoldier = (id) =>
+    setSoldierIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const filteredUsers = users.filter(u =>
+    !search ||
+    u.warName?.toLowerCase().includes(search.toLowerCase()) ||
+    u.warNumber?.toString().includes(search) ||
+    u.rank?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Preview: count cells that will be affected
+  const preview = (() => {
+    if (!soldierIds.length) return { count: 0, days: 0 };
+    const days = Math.max(0, dayTo - dayFrom + 1);
+    let count = 0;
+    for (let d = dayFrom; d <= dayTo; d++) {
+      duties.forEach(duty => {
+        const cell = cells[makeCellKey(d, duty.id)];
+        const cellUser = cell?.user?._id || cell?.user;
+        if (dutyScope === 'all') {
+          if (soldierIds.length === 0 || soldierIds.includes(cellUser) || !cell) count++;
+        } else {
+          // assigned: only cells where the soldier is already assigned
+          if (cell && soldierIds.includes(cellUser)) count++;
+        }
+      });
+    }
+    return { count, days };
+  })();
+
+  const handleApply = () => {
+    if (!soldierIds.length) { toast.error('Selecione ao menos 1 soldado'); return; }
+    if (dayFrom > dayTo)    { toast.error('Dia inicial deve ser ≤ dia final'); return; }
+
+    const updates = [];
+    for (let d = dayFrom; d <= dayTo; d++) {
+      duties.forEach(duty => {
+        const key = makeCellKey(d, duty.id);
+        const cell = cells[key];
+        const cellUser = cell?.user?._id || cell?.user;
+        const shouldUpdate = dutyScope === 'all'
+          ? soldierIds.includes(cellUser)           // anywhere in range where soldier is assigned
+          : (cell && soldierIds.includes(cellUser)); // only existing cells
+
+        if (shouldUpdate) {
+          updates.push({
+            day: d,
+            dutyId: duty.id,
+            user: cellUser,
+            status,
+            reason,
+            notes,
+            customColor,
+            manualOverride: true,
+          });
+        }
+      });
+    }
+
+    onApply(updates, { dayFrom, dayTo, status, reason, soldierCount: soldierIds.length });
+  };
+
+  const sc = statusColors[status] || {};
 
   return (
-    <div>
-      <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:14 }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(o => o-1)}>‹ Semana anterior</button>
-        <span style={{ flex:1,textAlign:'center',fontFamily:'var(--font-display)',fontSize:'0.78rem',color:'var(--accent)',letterSpacing:'0.06em' }}>
-          {format(monday,"dd/MM")} a {format(addDays(monday,6),"dd/MM/yyyy")}
-        </span>
-        <button className="btn btn-ghost btn-sm" onClick={() => setWeekOffset(o => o+1)}>Próxima semana ›</button>
-        <button className="btn btn-outline btn-sm" onClick={() => setWeekOffset(0)}>Hoje</button>
-      </div>
+    <div className="sc-modal-overlay" onClick={onClose}>
+      <div className="sc-modal sc-modal-wide" onClick={e => e.stopPropagation()}>
+        <div className="sc-modal-header">
+          <div>
+            <div className="sc-modal-title">⚡ Aplicação em Lote</div>
+            <div className="sc-modal-subtitle">Aplique status para múltiplos dias de uma vez</div>
+          </div>
+          <button className="sc-modal-close" onClick={onClose}>✕</button>
+        </div>
 
-      {days.map((day, di) => {
-        const sched = getScheduleForDay(day);
-        const isToday = day.toDateString() === now.toDateString();
-        const isSunday = day.getDay() === 0;
-        return (
-          <div key={di} className="card" style={{ marginBottom:10,opacity:isSunday?0.6:1 }}>
-            <div style={{
-              padding:'10px 16px',borderBottom:'1px solid var(--border)',
-              background:isToday?'rgba(107,124,94,.15)':'var(--bg-card)',
-              display:'flex',alignItems:'center',justifyContent:'space-between',
-              borderRadius:'var(--radius-md) var(--radius-md) 0 0',
-            }}>
-              <div style={{ display:'flex',alignItems:'center',gap:10 }}>
-                <span style={{ fontFamily:'var(--font-display)',fontSize:'0.8rem',color:isToday?'var(--accent)':'var(--text-primary)',fontWeight:700,letterSpacing:'0.06em' }}>
-                  {format(day,"EEEE",{locale:ptBR}).toUpperCase()}
-                </span>
-                {isToday && <span className="badge badge-success" style={{ fontSize:'0.48rem' }}>HOJE</span>}
-                {isSunday && <span className="badge" style={{ background:'#333',color:'#666',fontSize:'0.48rem' }}>DOMINGO</span>}
-              </div>
-              <span style={{ fontFamily:'var(--font-mono)',fontSize:'0.65rem',color:'var(--text-muted)' }}>
-                {format(day,'dd/MM/yyyy')}
-              </span>
+        <div className="sc-modal-body">
+
+          {/* STEP 1: Soldado(s) */}
+          <div className="sc-range-step">
+            <div className="sc-range-step-label">
+              <span className="sc-range-step-num">1</span>
+              Selecionar soldado(s)
             </div>
-            {sched ? (
-              <div style={{ padding:'10px 0' }}>
-                {sched.soldiers.map((s,i) => (
-                  <div key={i} className="admin-soldier-row">
-                    <span className="soldier-rank-badge" style={{ fontSize:'0.55rem' }}>{s.user?.rank?.split(' ')[0]||'SD'}</span>
-                    <span className="admin-soldier-name">{s.user?.warName}</span>
-                    <span className="admin-soldier-num">Nº {s.user?.warNumber}</span>
-                    <span className="admin-soldier-duty">{s.duty}</span>
-                    <span style={{ fontFamily:'var(--font-mono)',fontSize:'0.58rem',color:'var(--text-muted)',marginLeft:'auto',paddingRight:14 }}>
-                      {serviceStats[s.user?._id]||0} serv/30d
-                    </span>
-                  </div>
-                ))}
-                {sched.notes && <p className="admin-notes" style={{ margin:'6px 16px 0',fontSize:'0.7rem' }}>{sched.notes}</p>}
-              </div>
-            ) : (
-              <div style={{ padding:'14px 16px',color:'var(--text-muted)',fontSize:'0.75rem',fontStyle:'italic' }}>
-                Sem escala definida
+            <input className="sc-input" placeholder="Buscar nome, Nr., posto..."
+              value={search} onChange={e => setSearch(e.target.value)} />
+            <div className="sc-soldier-list sc-soldier-list--compact">
+              {filteredUsers.map(u => (
+                <div key={u._id}
+                  className={`sc-soldier-item ${soldierIds.includes(u._id) ? 'selected' : ''}`}
+                  onClick={() => toggleSoldier(u._id)}>
+                  <span className={`sc-check-box ${soldierIds.includes(u._id) ? 'checked' : ''}`}>
+                    {soldierIds.includes(u._id) ? '✓' : ''}
+                  </span>
+                  <span className="sc-badge-rank">{u.rank?.slice(0,3)}</span>
+                  <span className="sc-soldier-name">{u.warName}</span>
+                  <span className="sc-soldier-nr">Nr {u.warNumber}</span>
+                </div>
+              ))}
+            </div>
+            {soldierIds.length > 0 && (
+              <div className="sc-selected-hint">
+                {soldierIds.length} soldado(s) selecionado(s)
+                <button className="sc-link-btn" onClick={() => setSoldierIds([])}>limpar</button>
               </div>
             )}
           </div>
+
+          {/* STEP 2: Período */}
+          <div className="sc-range-step">
+            <div className="sc-range-step-label">
+              <span className="sc-range-step-num">2</span>
+              Período
+            </div>
+            <div className="sc-range-period">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label className="sc-label">Dia inicial</label>
+                <input type="number" min={1} max={totalDays} value={dayFrom}
+                  onChange={e => setDayFrom(Math.min(totalDays, Math.max(1, +e.target.value || 1)))}
+                  className="sc-input sc-input-day" />
+              </div>
+              <div className="sc-range-arrow">→</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label className="sc-label">Dia final</label>
+                <input type="number" min={1} max={totalDays} value={dayTo}
+                  onChange={e => setDayTo(Math.min(totalDays, Math.max(1, +e.target.value || 1)))}
+                  className="sc-input sc-input-day" />
+              </div>
+              <div className="sc-range-info">
+                <span>{Math.max(0, dayTo - dayFrom + 1)} dia(s)</span>
+                <span style={{ fontSize: 10, color: '#6b7280' }}>
+                  {MESES[month-1].slice(0,3)}/{year}
+                </span>
+              </div>
+            </div>
+
+            {/* Day range quick-select buttons */}
+            <div className="sc-range-quick">
+              {[[1,7,'1ª Sem.'],[8,14,'2ª Sem.'],[15,21,'3ª Sem.'],[22,totalDays,'4ª Sem.'],
+                [1,totalDays,'Mês todo']].map(([f,t,label]) => (
+                <button key={label} className={`sc-quick-btn ${dayFrom===f&&dayTo===t?'active':''}`}
+                  onClick={() => { setDayFrom(f); setDayTo(Math.min(t, totalDays)); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* STEP 3: Escopo de funções */}
+          <div className="sc-range-step">
+            <div className="sc-range-step-label">
+              <span className="sc-range-step-num">3</span>
+              Aplicar onde?
+            </div>
+            <div className="sc-scope-options">
+              <label className={`sc-scope-option ${dutyScope==='assigned'?'active':''}`}>
+                <input type="radio" value="assigned" checked={dutyScope==='assigned'}
+                  onChange={() => setDutyScope('assigned')} />
+                <div>
+                  <strong>Somente onde está escalado</strong>
+                  <span>Atualiza células onde o soldado já está atribuído</span>
+                </div>
+              </label>
+              <label className={`sc-scope-option ${dutyScope==='all'?'active':''}`}>
+                <input type="radio" value="all" checked={dutyScope==='all'}
+                  onChange={() => setDutyScope('all')} />
+                <div>
+                  <strong>Todos os dias do período</strong>
+                  <span>Marca todos os dias independente da função</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* STEP 4: Status */}
+          <div className="sc-range-step">
+            <div className="sc-range-step-label">
+              <span className="sc-range-step-num">4</span>
+              Status a aplicar
+            </div>
+            <div className="sc-status-grid sc-status-grid--wrap">
+              {allStatuses.map(([key]) => (
+                <StatusChip key={key} statusKey={key} statusColors={statusColors}
+                  active={status === key} onClick={() => setStatus(key)} size="sm" />
+              ))}
+            </div>
+
+            {status !== 'ativo' && (
+              <>
+                <label className="sc-label" style={{ marginTop: 12 }}>Motivo / Diagnóstico</label>
+                <input className="sc-input"
+                  placeholder="Ex: Dengue hemorrágica, Licença maternidade, Fratura no joelho..."
+                  value={reason} onChange={e => setReason(e.target.value)} />
+                <div className="sc-reason-suggestions">
+                  {['Dengue hemorrágica','Licença maternidade','Licença paternidade',
+                    'Cirurgia programada','Fratura óssea','Covid-19','Luto por familiar',
+                    'Missão Operacional','Curso EsFCEx','Férias regulamentares',
+                  ].map(r => (
+                    <button key={r} className={`sc-tag ${reason===r?'active':''}`}
+                      onClick={() => setReason(r)}>{r}</button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <label className="sc-label" style={{ marginTop: 12 }}>Observações</label>
+            <input className="sc-input" placeholder="Obs. adicionais..."
+              value={notes} onChange={e => setNotes(e.target.value)} />
+          </div>
+
+          {/* Preview banner */}
+          <div className={`sc-range-preview ${preview.count > 0 ? 'has-data' : ''}`}
+            style={{ '--preview-bg': sc.bgColor || '#374151', '--preview-text': sc.textColor || '#fff' }}>
+            <div className="sc-range-preview-icon">⚡</div>
+            <div>
+              <div className="sc-range-preview-title">
+                {preview.count > 0
+                  ? `${preview.count} célula(s) serão atualizadas`
+                  : 'Nenhuma célula encontrada com os filtros selecionados'}
+              </div>
+              {preview.count > 0 && (
+                <div className="sc-range-preview-detail">
+                  {soldierIds.length} soldado(s) · dias {dayFrom}–{dayTo} ·&nbsp;
+                  <span style={{ fontWeight: 700, color: sc.bgColor }}>
+                    {statusColors[status]?.label || status}
+                  </span>
+                  {reason && ` — "${reason}"`}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="sc-modal-footer">
+          <button className="sc-btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="sc-btn-primary" onClick={handleApply} disabled={!soldierIds.length}>
+            ⚡ Aplicar {preview.count > 0 ? `(${preview.count} células)` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Configurações (com gestão completa de status) ────────────────────
+
+function ConfigModal({ duties, statusColors, onSave, onClose }) {
+  const [localDuties,  setLocalDuties]  = useState(JSON.parse(JSON.stringify(duties)));
+  const [localColors,  setLocalColors]  = useState(JSON.parse(JSON.stringify(statusColors)));
+  const [tab,          setTab]          = useState('status');
+  const [editingKey,   setEditingKey]   = useState(null); // key being renamed inline
+
+  // ── Status management ──────────────────────────────────────────────────────
+
+  const addStatus = () => {
+    const key = genId();
+    setLocalColors(prev => ({
+      ...prev,
+      [key]: { label: 'Novo Status', bgColor: '#374151', textColor: '#ffffff', builtIn: false },
+    }));
+    setEditingKey(key);
+  };
+
+  const removeStatus = (key) => {
+    if (BUILT_IN_STATUS_KEYS.includes(key)) return; // proteção
+    setLocalColors(prev => { const n = { ...prev }; delete n[key]; return n; });
+  };
+
+  const updateStatus = (key, field, val) =>
+    setLocalColors(prev => ({ ...prev, [key]: { ...prev[key], [field]: val } }));
+
+  // ── Duty management ────────────────────────────────────────────────────────
+
+  const addDuty = () =>
+    setLocalDuties(prev => [...prev, { id: genId(), name: '', abbreviation: '', order: prev.length }]);
+
+  const removeDuty = (id) => setLocalDuties(prev => prev.filter(d => d.id !== id));
+
+  const updateDuty = (id, field, val) =>
+    setLocalDuties(prev => prev.map(d => d.id === id ? { ...d, [field]: val } : d));
+
+  return (
+    <div className="sc-modal-overlay" onClick={onClose}>
+      <div className="sc-modal sc-modal-wide" onClick={e => e.stopPropagation()}>
+        <div className="sc-modal-header">
+          <div className="sc-modal-title">⚙️ Configurações da Escala</div>
+          <button className="sc-modal-close" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="sc-config-tabs">
+          <button className={tab === 'status' ? 'active' : ''} onClick={() => setTab('status')}>
+            🎨 Status & Cores
+          </button>
+          <button className={tab === 'duties' ? 'active' : ''} onClick={() => setTab('duties')}>
+            📋 Funções / Postos
+          </button>
+        </div>
+
+        <div className="sc-modal-body">
+
+          {/* ── Tab: Status ── */}
+          {tab === 'status' && (
+            <div>
+              <p className="sc-help-text">
+                Renomeie, mude cores ou crie novos status. Tudo fica salvo no banco de dados.
+                Os status em cinza escuro são padrão do sistema (não podem ser removidos, mas podem ser renomeados).
+              </p>
+
+              {Object.entries(localColors).map(([key, val]) => {
+                const isBuiltIn = BUILT_IN_STATUS_KEYS.includes(key);
+                return (
+                  <div key={key} className="sc-status-edit-row">
+                    {/* Color swatch preview */}
+                    <div className="sc-status-swatch" style={{ background: val.bgColor, color: val.textColor }}>
+                      {val.label || key}
+                    </div>
+
+                    {/* Label input */}
+                    <input
+                      className={`sc-input sc-input-flex ${editingKey === key ? 'sc-input-focus' : ''}`}
+                      value={val.label || ''}
+                      placeholder="Nome do status..."
+                      onChange={e => updateStatus(key, 'label', e.target.value)}
+                      onFocus={() => setEditingKey(key)}
+                      onBlur={() => setEditingKey(null)}
+                    />
+
+                    {/* Color pickers */}
+                    <div className="sc-color-pickers">
+                      <div className="sc-color-picker-group">
+                        <span className="sc-color-picker-label">Fundo</span>
+                        <input type="color" value={val.bgColor || '#374151'}
+                          onChange={e => updateStatus(key, 'bgColor', e.target.value)}
+                          className="sc-color-input" />
+                      </div>
+                      <div className="sc-color-picker-group">
+                        <span className="sc-color-picker-label">Texto</span>
+                        <input type="color" value={val.textColor || '#ffffff'}
+                          onChange={e => updateStatus(key, 'textColor', e.target.value)}
+                          className="sc-color-input" />
+                      </div>
+                    </div>
+
+                    {/* Delete (only for custom) */}
+                    {!isBuiltIn
+                      ? <button className="sc-btn-icon-danger" onClick={() => removeStatus(key)} title="Remover status">✕</button>
+                      : <div className="sc-built-in-badge" title="Status padrão do sistema">🔒</div>
+                    }
+                  </div>
+                );
+              })}
+
+              <button className="sc-btn-add" onClick={addStatus}>＋ Criar novo status personalizado</button>
+
+              <div className="sc-config-note">
+                💡 Dica: você pode criar status como "Licença Maternidade", "TDC", "Missão COTER", "COVID" etc.
+                e eles ficam disponíveis para aplicar em lote ou célula a célula.
+              </div>
+            </div>
+          )}
+
+          {/* ── Tab: Funções ── */}
+          {tab === 'duties' && (
+            <div>
+              <p className="sc-help-text">Defina as funções/postos que aparecem nas linhas da escala.</p>
+              {localDuties.map((d, i) => (
+                <div key={d.id} className="sc-duty-row">
+                  <span className="sc-duty-num">{i + 1}</span>
+                  <input className="sc-input sc-input-flex" placeholder="Nome da função"
+                    value={d.name} onChange={e => updateDuty(d.id, 'name', e.target.value)} />
+                  <input className="sc-input sc-input-abbrev" placeholder="Abrev."
+                    value={d.abbreviation} onChange={e => updateDuty(d.id, 'abbreviation', e.target.value)} />
+                  <button className="sc-btn-icon-danger" onClick={() => removeDuty(d.id)}>✕</button>
+                </div>
+              ))}
+              <button className="sc-btn-add" onClick={addDuty}>＋ Adicionar Função</button>
+            </div>
+          )}
+        </div>
+
+        <div className="sc-modal-footer">
+          <button className="sc-btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="sc-btn-primary"
+            onClick={() => onSave(localDuties.filter(d => d.name), localColors)}>
+            💾 Salvar Configurações
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: Ciclo ─────────────────────────────────────────────────────────────
+
+function CycleModal({ cycleLength, cycleStartDay, duties, cycleTemplate, users, onApply, onClose }) {
+  const [len,      setLen]      = useState(cycleLength   || 8);
+  const [startDay, setStartDay] = useState(cycleStartDay || 1);
+  const [template, setTemplate] = useState(() => {
+    const map = {};
+    (cycleTemplate || []).forEach(ct => {
+      map[`${ct.dutyId}_${ct.cycleDay}`] = ct.user?._id || ct.user || '';
+    });
+    return map;
+  });
+  const [search, setSearch] = useState('');
+
+  const setCell = (dutyId, cycleDay, userId) =>
+    setTemplate(prev => ({ ...prev, [`${dutyId}_${cycleDay}`]: userId }));
+
+  const handleApply = () => {
+    const arr = [];
+    Object.entries(template).forEach(([key, userId]) => {
+      const parts = key.split('_');
+      const cycleDay = parseInt(parts.pop());
+      const dutyId   = parts.join('_');
+      if (userId) arr.push({ dutyId, cycleDay, user: userId });
+    });
+    onApply(arr, len, startDay);
+  };
+
+  const filteredUsers = users.filter(u =>
+    !search || u.warName?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="sc-modal-overlay" onClick={onClose}>
+      <div className="sc-modal sc-modal-xl" onClick={e => e.stopPropagation()}>
+        <div className="sc-modal-header">
+          <div>
+            <div className="sc-modal-title">🔄 Configurar Ciclo de Escala</div>
+            <div className="sc-modal-subtitle">Padrão de {len} dias — aplica ao mês inteiro automaticamente</div>
+          </div>
+          <button className="sc-modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="sc-modal-body">
+          <div className="sc-cycle-settings">
+            <div className="sc-cycle-setting-item">
+              <label className="sc-label">Duração do ciclo (dias)</label>
+              <input type="number" min={1} max={31} value={len}
+                onChange={e => setLen(Math.max(1,Math.min(31,parseInt(e.target.value)||8)))}
+                className="sc-input sc-input-sm" />
+            </div>
+            <div className="sc-cycle-setting-item">
+              <label className="sc-label">Dia inicial do ciclo</label>
+              <input type="number" min={1} max={31} value={startDay}
+                onChange={e => setStartDay(Math.max(1,Math.min(31,parseInt(e.target.value)||1)))}
+                className="sc-input sc-input-sm" />
+            </div>
+            <div className="sc-cycle-setting-item">
+              <label className="sc-label">Buscar soldado</label>
+              <input className="sc-input sc-input-sm" placeholder="Nome..."
+                value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <div className="sc-cycle-help">
+            <strong>Como funciona:</strong> Preencha quem faz cada função em cada dia do ciclo (D1 a D{len}).
+            Ao aplicar, o mês inteiro será preenchido repetindo este padrão a partir do dia {startDay}.
+            Célula preenchidas manualmente são preservadas.
+          </div>
+          <div className="sc-cycle-scroll">
+            <table className="sc-cycle-table">
+              <thead>
+                <tr>
+                  <th className="sc-cycle-th-duty">Função / Posto</th>
+                  {Array.from({ length: len }, (_, i) => (
+                    <th key={i+1} className="sc-cycle-th-day">D{i+1}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {duties.map(duty => (
+                  <tr key={duty.id}>
+                    <td className="sc-cycle-td-duty">{duty.name}</td>
+                    {Array.from({ length: len }, (_, i) => {
+                      const cycleDay = i + 1;
+                      const val = template[`${duty.id}_${cycleDay}`] || '';
+                      return (
+                        <td key={cycleDay} className="sc-cycle-td">
+                          <select className="sc-cycle-select" value={val}
+                            onChange={e => setCell(duty.id, cycleDay, e.target.value)}>
+                            <option value="">—</option>
+                            {filteredUsers.map(u => (
+                              <option key={u._id} value={u._id}>{u.warName}</option>
+                            ))}
+                          </select>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="sc-modal-footer">
+          <button className="sc-btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="sc-btn-primary" onClick={handleApply}>✔ Aplicar Ciclo ao Mês</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Painel Baixados ──────────────────────────────────────────────────────────
+
+function BaixadosPanel({ cells, duties, users, statusColors, onEditCell, month, year }) {
+  const baixados = cells.filter(c => c.status && c.status !== 'ativo' && (c.user?._id || c.user));
+  const grouped  = {};
+  baixados.forEach(c => {
+    const uid = c.user?._id || c.user;
+    if (!uid) return;
+    if (!grouped[uid]) grouped[uid] = { user: c.user, entries: [] };
+    grouped[uid].entries.push(c);
+  });
+
+  if (!Object.keys(grouped).length) {
+    return (
+      <div className="sc-baixados-empty">
+        <div style={{ fontSize: 40 }}>✅</div>
+        <p>Nenhum militar baixado ou afastado em {MESES[month-1]}/{year}.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sc-baixados-list">
+      <div className="sc-section-title">
+        Militares Baixados / Afastados — {MESES[month-1]}/{year}
+        <span className="sc-badge-count">{Object.keys(grouped).length}</span>
+      </div>
+      {Object.values(grouped).map(({ user, entries }) => {
+        const u = typeof user === 'object' ? user : users.find(x => x._id === user);
+        const uniqueStatuses = [...new Set(entries.map(e => e.status))];
+        const uniqueReasons  = [...new Set(entries.map(e => e.reason).filter(Boolean))];
+        return (
+          <div key={u?._id || user} className="sc-baixado-card">
+            <div className="sc-baixado-card-header">
+              <div className="sc-baixado-avatar">{u?.warName?.[0] || '?'}</div>
+              <div>
+                <div className="sc-baixado-name">{u?.rank} {u?.warName || 'Desconhecido'}</div>
+                <div className="sc-baixado-nr">Nr {u?.warNumber} · {entries.length} dia(s)</div>
+              </div>
+              <div className="sc-baixado-statuses">
+                {uniqueStatuses.map(s => {
+                  const c = statusColors[s];
+                  return (
+                    <span key={s} className="sc-status-chip"
+                      style={{ background: c?.bgColor, color: c?.textColor }}>
+                      {c?.label || s}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            {uniqueReasons.length > 0 && (
+              <div className="sc-baixado-reason">
+                <strong>Motivo:</strong> {uniqueReasons.join('; ')}
+              </div>
+            )}
+            <div className="sc-baixado-days">
+              {entries.sort((a,b) => a.day - b.day).map(e => {
+                const c = statusColors[e.status];
+                const duty = duties.find(d => d.id === e.dutyId);
+                return (
+                  <span key={`${e.day}-${e.dutyId}`} className="sc-day-chip"
+                    style={{ background: c?.bgColor+'22', color: c?.bgColor, border:`1px solid ${c?.bgColor}55` }}
+                    title={`${duty?.name} — ${e.reason || e.status}`}
+                    onClick={() => onEditCell(e.day, e.dutyId)}>
+                    {String(e.day).padStart(2,'0')}/{String(month).padStart(2,'0')}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export default function AdminSchedulePage() {
+  const now = new Date();
+  const [month,          setMonth]         = useState(now.getMonth() + 1);
+  const [year,           setYear]          = useState(now.getFullYear());
+  const [users,          setUsers]         = useState([]);
+  const [planilhaId,     setPlanilhaId]    = useState(null);
+  const [title,          setTitle]         = useState('');
+  const [unit,           setUnit]          = useState('');
+  const [duties,         setDuties]        = useState(DEFAULT_DUTIES);
+  const [statusColors,   setStatusColors]  = useState(DEFAULT_STATUS_COLORS);
+  const [cycleLength,    setCycleLength]   = useState(8);
+  const [cycleStartDay,  setCycleStartDay] = useState(1);
+  const [cycleTemplate,  setCycleTemplate] = useState([]);
+  const [cells,          setCells]         = useState({});   // key:"day-dutyId" → cell
+  const [activeTab,      setActiveTab]     = useState('planilha');
+  const [cellModal,      setCellModal]     = useState(null); // {day, dutyId}
+  const [showConfig,     setShowConfig]    = useState(false);
+  const [showCycle,      setShowCycle]     = useState(false);
+  const [showRangeApply, setShowRangeApply]= useState(false);
+  const [saving,         setSaving]        = useState(false);
+  const [loading,        setLoading]       = useState(true);
+
+  // ── Aba Militares ─────────────────────────────────────────────────────────
+  const [usersWithPerms, setUsersWithPerms] = useState([]);
+  const [savingPerm,     setSavingPerm]     = useState(null);
+  const [milSearch,      setMilSearch]      = useState('');
+  const [selectedSoldier,setSelectedSoldier]= useState(null); // modal histórico
+  const [soldierStats,   setSoldierStats]   = useState(null);
+  const [soldierStatsTab,setSoldierStatsTab]= useState('chamada');
+
+  // ── Aba Chamadas ──────────────────────────────────────────────────────────
+  const [chamadas,          setChamadas]          = useState([]);
+  const [chamadaSearch,     setChamadaSearch]     = useState('');
+  const [chamadaLoading,    setChamadaLoading]    = useState(false);
+  const [selectedChamada,   setSelectedChamada]   = useState(null); // ver detalhe
+  const [exportingDocx,     setExportingDocx]     = useState(false);
+
+  const totalDays = daysInMonth(month, year);
+
+  // ── Load ──────────────────────────────────────────────────────────────────
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [uRes, pRes] = await Promise.all([
+        api.get('/users'),
+        api.get(`/planilha?month=${month}&year=${year}`),
+      ]);
+      setUsers(uRes.data?.users || uRes.data || []);
+
+      const p = pRes.data;
+      if (p) {
+        setPlanilhaId(p._id);
+        setTitle(p.title || '');
+        setUnit(p.unit  || '');
+        setDuties(p.duties?.length ? p.duties : DEFAULT_DUTIES);
+        setCycleLength(p.cycleLength   || 8);
+        setCycleStartDay(p.cycleStartDay || 1);
+        setCycleTemplate(p.cycleTemplate || []);
+        setStatusColors(normalizeStatusColors(p.statusColors));
+        const cm = {};
+        (p.cells || []).forEach(c => { cm[makeCellKey(c.day, c.dutyId)] = c; });
+        setCells(cm);
+      } else {
+        setPlanilhaId(null);
+        setTitle(`ESCALA DE SERVIÇO — ${MESES[month-1].toUpperCase()} ${year}`);
+        setUnit(''); setDuties(DEFAULT_DUTIES); setStatusColors(DEFAULT_STATUS_COLORS);
+        setCycleLength(8); setCycleStartDay(1); setCycleTemplate([]); setCells({});
+      }
+    } catch { toast.error('Erro ao carregar escala'); }
+    finally  { setLoading(false); }
+  }, [month, year]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      // Serialize statusColors as plain object (Map não serializa bem via axios)
+      const sc = {};
+      Object.entries(statusColors).forEach(([k, v]) => { sc[k] = v; });
+
+      const payload = {
+        month, year, title, unit,
+        cycleLength, cycleStartDay,
+        duties,
+        statusColors: sc,
+        cells: Object.values(cells).map(c => ({
+          day: c.day, dutyId: c.dutyId,
+          user: c.user?._id || c.user || null,
+          status: c.status || 'ativo',
+          reason: c.reason || '',
+          notes: c.notes  || '',
+          customColor: c.customColor || '',
+          manualOverride: c.manualOverride || false,
+        })),
+        cycleTemplate: cycleTemplate.map(ct => ({
+          dutyId: ct.dutyId, cycleDay: ct.cycleDay,
+          user: ct.user?._id || ct.user || null,
+        })),
+      };
+      const res = await api.post('/planilha', payload);
+      const p   = res.data;
+      setPlanilhaId(p._id);
+      // Re-sync status colors from response
+      setStatusColors(normalizeStatusColors(p.statusColors));
+      const cm = {};
+      (p.cells || []).forEach(c => { cm[makeCellKey(c.day, c.dutyId)] = c; });
+      setCells(cm);
+      toast.success('✅ Escala salva com sucesso!');
+    } catch { toast.error('Erro ao salvar escala'); }
+    finally  { setSaving(false); }
+  };
+
+  // ── Cell operations ───────────────────────────────────────────────────────
+
+  const handleCellSave = (cellData) => {
+    setCells(prev => ({ ...prev, [makeCellKey(cellData.day, cellData.dutyId)]: cellData }));
+    setCellModal(null);
+  };
+
+  const handleCellClear = (day, dutyId) => {
+    setCells(prev => { const n = { ...prev }; delete n[makeCellKey(day, dutyId)]; return n; });
+    setCellModal(null);
+  };
+
+  // ── Range apply ───────────────────────────────────────────────────────────
+
+  const handleRangeApply = (updates, summary) => {
+    setCells(prev => {
+      const next = { ...prev };
+      updates.forEach(upd => { next[makeCellKey(upd.day, upd.dutyId)] = upd; });
+      return next;
+    });
+    setShowRangeApply(false);
+    toast.success(
+      `✅ ${updates.length} células atualizadas — ${statusColors[summary.status]?.label || summary.status}` +
+      (summary.reason ? ` (${summary.reason})` : '')
+    );
+  };
+
+  // ── Config save ───────────────────────────────────────────────────────────
+
+  const handleConfigSave = (newDuties, newColors) => {
+    setDuties(newDuties.map((d,i) => ({ ...d, order: i })));
+    setStatusColors(newColors);
+    setShowConfig(false);
+    toast.success('Configurações salvas — clique em 💾 Salvar Escala para persistir');
+  };
+
+  // ── Cycle apply ───────────────────────────────────────────────────────────
+
+  const handleCycleApply = (template, len, startDay) => {
+    setCycleTemplate(template);
+    setCycleLength(len);
+    setCycleStartDay(startDay);
+    const newCells = {};
+    for (let day = 1; day <= totalDays; day++) {
+      const cycleDay = ((day - startDay) % len + len) % len + 1;
+      duties.forEach(duty => {
+        const ct = template.find(t => t.dutyId === duty.id && t.cycleDay === cycleDay);
+        if (ct) {
+          const key = makeCellKey(day, duty.id);
+          if (!cells[key]?.manualOverride) {
+            newCells[key] = { day, dutyId: duty.id, user: ct.user||null,
+              status:'ativo', reason:'', notes:'', customColor:'', manualOverride:false };
+          }
+        }
+      });
+    }
+    setCells(prev => {
+      const merged = { ...newCells };
+      Object.entries(prev).forEach(([k, v]) => { if (v.manualOverride) merged[k] = v; });
+      return merged;
+    });
+    setShowCycle(false);
+    toast.success(`✅ Ciclo de ${len} dias aplicado! Clique em 💾 Salvar para persistir.`);
+  };
+
+  // ── Nav ───────────────────────────────────────────────────────────────────
+
+  const prevMonth = () => { if (month===1){setMonth(12);setYear(y=>y-1);}else setMonth(m=>m-1); };
+  const nextMonth = () => { if (month===12){setMonth(1);setYear(y=>y+1);}else setMonth(m=>m+1); };
+
+  // ── Carregar usuários com permissões ──────────────────────────────────────
+  const loadUsersWithPerms = useCallback(async () => {
+    try {
+      const res = await api.get('/permissoes');
+      setUsersWithPerms(res.data);
+    } catch { toast.error('Erro ao carregar militares.'); }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'militares') loadUsersWithPerms();
+    if (activeTab === 'chamadas')  loadChamadas();
+  }, [activeTab]);
+
+  const toggleChamadaAccess = async (user) => {
+    setSavingPerm(user._id);
+    try {
+      const res = await api.patch(`/permissoes/${user._id}/chamada`, {
+        hasChamadaAccess: !user.hasChamadaAccess,
+      });
+      setUsersWithPerms(prev => prev.map(u => u._id === user._id ? { ...u, ...res.data } : u));
+      toast.success(`${user.warName}: acesso ${res.data.hasChamadaAccess ? 'LIBERADO ✔' : 'REMOVIDO ✘'}`);
+    } catch { toast.error('Erro ao atualizar permissão.'); }
+    finally { setSavingPerm(null); }
+  };
+
+  const openSoldierHistory = async (user) => {
+    setSelectedSoldier(user);
+    setSoldierStats(null);
+    try {
+      const [c, a] = await Promise.all([
+        api.get(`/chamada/stats/soldado/${user._id}`),
+        api.get(`/auditoria/stats/soldado/${user._id}`),
+      ]);
+      setSoldierStats({ chamada: c.data, auditoria: a.data });
+    } catch { toast.error('Erro ao carregar histórico.'); }
+  };
+
+  // ── Chamadas ──────────────────────────────────────────────────────────────
+  const loadChamadas = useCallback(async () => {
+    setChamadaLoading(true);
+    try {
+      const res = await api.get('/chamada?limit=60');
+      setChamadas(res.data);
+    } catch { toast.error('Erro ao carregar chamadas.'); }
+    finally { setChamadaLoading(false); }
+  }, []);
+
+  const exportChamadaDocx = async (chamada) => {
+    setExportingDocx(chamada._id);
+    try {
+      const response = await api.get(
+        `/planilha/export/docx?month=${new Date(chamada.date).getMonth()+1}&year=${new Date(chamada.date).getFullYear()}`,
+        { responseType: 'blob' }
+      );
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      const d    = new Date(chamada.date);
+      a.href     = url;
+      a.download = `escala-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Documento Word gerado!');
+    } catch { toast.error('Erro ao gerar documento Word.'); }
+    finally { setExportingDocx(null); }
+  };
+
+  const exportEscalaDocx = async () => {
+    setExportingDocx('escala');
+    try {
+      const response = await api.get(
+        `/planilha/export/docx?month=${month}&year=${year}`,
+        { responseType: 'blob' }
+      );
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `escala-${String(month).padStart(2,'0')}-${year}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Escala exportada como Word!');
+    } catch { toast.error('Erro ao exportar escala.'); }
+    finally { setExportingDocx(null); }
+  };
+
+  // ── Computed ──────────────────────────────────────────────────────────────
+
+  const getCell  = (day, dutyId) => cells[makeCellKey(day, dutyId)];
+  const baixadosCount = Object.values(cells).filter(c => c.status && c.status !== 'ativo' && (c.user?._id||c.user)).length;
+
+  const getCellStyle = (cell) => {
+    if (!cell) return {};
+    if (cell.customColor) return { background: cell.customColor, color: '#fff' };
+    const c = statusColors[cell.status || 'ativo'];
+    return c ? { background: c.bgColor, color: c.textColor } : {};
+  };
+
+  const getUserShortName = (cell) => {
+    if (!cell?.user) return '';
+    const u = typeof cell.user === 'object' ? cell.user : users.find(x => x._id === cell.user);
+    return u?.warName?.split(' ')[0] || '?';
+  };
+
+  const cellModalData = cellModal
+    ? { cell: getCell(cellModal.day, cellModal.dutyId), duty: duties.find(d => d.id === cellModal.dutyId) }
+    : null;
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  if (loading) return (
+    <div className="sc-loading">
+      <div className="sc-loading-spinner" />
+      <p>Carregando escala...</p>
+    </div>
+  );
+
+  return (
+    <div className="sc-page">
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <div className="sc-header">
+        <div className="sc-header-top">
+          <div className="sc-header-title-block">
+            <div className="sc-header-icon">🎖️</div>
+            <div>
+              <input className="sc-title-input" value={title}
+                onChange={e => setTitle(e.target.value)} placeholder="Título da escala..." />
+              <input className="sc-unit-input" value={unit}
+                onChange={e => setUnit(e.target.value)} placeholder="Unidade / Subunidade..." />
+            </div>
+          </div>
+
+          <div className="sc-header-controls">
+            <div className="sc-month-nav">
+              <button className="sc-nav-btn" onClick={prevMonth}>‹</button>
+              <div className="sc-month-label">
+                <select value={month} onChange={e=>setMonth(+e.target.value)} className="sc-month-select">
+                  {MESES.map((m,i)=><option key={i+1} value={i+1}>{m}</option>)}
+                </select>
+                <input type="number" min={2000} max={2100} value={year}
+                  onChange={e=>setYear(+e.target.value||year)} className="sc-year-input" />
+              </div>
+              <button className="sc-nav-btn" onClick={nextMonth}>›</button>
+            </div>
+
+            <div className="sc-header-actions">
+              <button className="sc-btn-outline" onClick={() => setShowConfig(true)}>⚙️ Config</button>
+              <button className="sc-btn-outline" onClick={() => setShowCycle(true)}>🔄 Ciclo</button>
+              <button className="sc-btn-range" onClick={() => setShowRangeApply(true)}>⚡ Em Lote</button>
+              <button
+                className="sc-btn-outline"
+                style={{ color: '#60a5fa', borderColor: '#2563eb' }}
+                disabled={exportingDocx === 'escala'}
+                onClick={exportEscalaDocx}
+                title="Baixar escala do mês como Word"
+              >
+                {exportingDocx === 'escala' ? '⏳...' : '📄 Word'}
+              </button>
+              <button className="sc-btn-save" onClick={handleSave} disabled={saving}>
+                {saving ? '⏳ Salvando...' : '💾 Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="sc-tabs">
+          <button className={`sc-tab ${activeTab==='planilha'?'active':''}`} onClick={()=>setActiveTab('planilha')}>
+            📋 Planilha
+          </button>
+          <button className={`sc-tab ${activeTab==='baixados'?'active':''}`} onClick={()=>setActiveTab('baixados')}>
+            🔴 Baixados / Afastados
+            {baixadosCount > 0 && <span className="sc-tab-badge">{baixadosCount}</span>}
+          </button>
+          <button className={`sc-tab ${activeTab==='legenda'?'active':''}`} onClick={()=>setActiveTab('legenda')}>
+            🎨 Legenda
+          </button>
+        </div>
+      </div>
+
+      {/* ── Planilha ────────────────────────────────────────────────────────── */}
+      {activeTab === 'planilha' && (
+        <div className="sc-planilha-container">
+          <div className="sc-grid-wrapper">
+            <table className="sc-grid">
+              <thead>
+                <tr className="sc-row-days">
+                  <th className="sc-th-function">
+                    <div className="sc-th-function-inner">
+                      <span>FUNÇÃO / POSTO</span>
+                      <span className="sc-th-cycle-info">Ciclo {cycleLength}d</span>
+                    </div>
+                  </th>
+                  {Array.from({ length: totalDays }, (_, i) => {
+                    const d = i + 1;
+                    const dow = getDayOfWeek(d, month, year);
+                    const isWE = dow===0||dow===6;
+                    const isToday = d===now.getDate() && month===now.getMonth()+1 && year===now.getFullYear();
+                    return (
+                      <th key={d} className={`sc-th-day ${isWE?'weekend':''} ${isToday?'today':''}`}>
+                        <div className="sc-day-num">{String(d).padStart(2,'0')}</div>
+                        <div className="sc-day-dow">{DIAS_SEMANA_ABREV[dow]}</div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {duties.map((duty, di) => (
+                  <tr key={duty.id} className={`sc-row-duty ${di%2===0?'even':'odd'}`}>
+                    <td className="sc-td-function">
+                      <div className="sc-function-name">{duty.name}</div>
+                      {duty.abbreviation && <div className="sc-function-abbrev">{duty.abbreviation}</div>}
+                    </td>
+                    {Array.from({ length: totalDays }, (_, i) => {
+                      const day  = i + 1;
+                      const cell = getCell(day, duty.id);
+                      const dow  = getDayOfWeek(day, month, year);
+                      const isWE = dow===0||dow===6;
+                      const isToday = day===now.getDate() && month===now.getMonth()+1 && year===now.getFullYear();
+                      const label = getUserShortName(cell);
+                      const cycleDay = ((day - cycleStartDay) % cycleLength + cycleLength) % cycleLength + 1;
+
+                      return (
+                        <td key={day}
+                          className={`sc-td-cell ${isWE?'weekend':''} ${isToday?'today':''} ${cell?'filled':'empty'}`}
+                          onClick={() => setCellModal({ day, dutyId: duty.id })}
+                          title={cell?.reason ? `${label} — ${cell.reason}` : label}>
+                          {cell?.user ? (
+                            <div className="sc-cell-content" style={getCellStyle(cell)}>
+                              <span className="sc-cell-name">{label}</span>
+                              {cell.status && cell.status !== 'ativo' && (
+                                <span className="sc-cell-status-dot"
+                                  title={statusColors[cell.status]?.label || cell.status} />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="sc-cell-empty">
+                              <span className="sc-cell-cycle">{cycleDay}</span>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Quick legend */}
+          <div className="sc-quick-legend">
+            {Object.entries(statusColors).map(([key, val]) => (
+              <div key={key} className="sc-legend-item">
+                <span className="sc-legend-dot" style={{ background: val.bgColor }} />
+                <span className="sc-legend-label">{val.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Baixados ────────────────────────────────────────────────────────── */}
+      {activeTab === 'baixados' && (
+        <div className="sc-tab-content">
+          <BaixadosPanel
+            cells={Object.values(cells)} duties={duties} users={users}
+            statusColors={statusColors} month={month} year={year}
+            onEditCell={(day, dutyId) => { setCellModal({ day, dutyId }); setActiveTab('planilha'); }}
+          />
+        </div>
+      )}
+
+
+
+            {/* ── Legenda ─────────────────────────────────────────────────────────── */}
+      {activeTab === 'legenda' && (
+        <div className="sc-tab-content">
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
+            <div className="sc-section-title" style={{ margin: 0 }}>Status & Cores</div>
+            <button className="sc-btn-outline" onClick={() => setShowConfig(true)}>
+              ⚙️ Editar status
+            </button>
+          </div>
+          <div className="sc-legend-grid">
+            {Object.entries(statusColors).map(([key, val]) => (
+              <div key={key} className="sc-legend-card" style={{ borderLeft:`4px solid ${val.bgColor}` }}>
+                <div className="sc-legend-swatch" style={{ background:val.bgColor, color:val.textColor }}>
+                  {val.label}
+                </div>
+                <div className="sc-legend-key">{key}{!BUILT_IN_STATUS_KEYS.includes(key) && ' · personalizado'}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="sc-section-title" style={{ marginTop:32 }}>Funções / Postos</div>
+          <div className="sc-duties-overview">
+            {duties.map((d, i) => (
+              <div key={d.id} className="sc-duty-overview-item">
+                <span className="sc-duty-num">{i+1}</span>
+                <span className="sc-duty-full-name">{d.name}</span>
+                {d.abbreviation && <span className="sc-duty-abbrev-badge">{d.abbreviation}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modais ──────────────────────────────────────────────────────────── */}
+
+      {cellModal && cellModalData && (
+        <CellEditModal
+          cell={cellModalData.cell} duty={cellModalData.duty}
+          day={cellModal.day} month={month} year={year}
+          users={users} statusColors={statusColors}
+          onSave={handleCellSave} onClear={handleCellClear} onClose={() => setCellModal(null)}
+        />
+      )}
+
+      {showRangeApply && (
+        <RangeApplyModal
+          totalDays={totalDays} month={month} year={year}
+          users={users} duties={duties} cells={cells} statusColors={statusColors}
+          onApply={handleRangeApply} onClose={() => setShowRangeApply(false)}
+        />
+      )}
+
+      {showConfig && (
+        <ConfigModal duties={duties} statusColors={statusColors}
+          onSave={handleConfigSave} onClose={() => setShowConfig(false)} />
+      )}
+
+      {showCycle && (
+        <CycleModal cycleLength={cycleLength} cycleStartDay={cycleStartDay}
+          duties={duties} cycleTemplate={cycleTemplate} users={users}
+          onApply={handleCycleApply} onClose={() => setShowCycle(false)} />
+      )}
     </div>
   );
 }
