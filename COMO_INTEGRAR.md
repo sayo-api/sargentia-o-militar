@@ -1,54 +1,62 @@
-# Como integrar — escala-v5
+# Como integrar — escala-v6 (rotas atualizadas)
 
-## 1. Instalar dependência Word (se ainda não fez)
+## Novas páginas e rotas
 
-```bash
-cd server && npm install docx
-```
+| Página | Rota | Quem acessa |
+|--------|------|-------------|
+| `AdminUsuariosPage`   | `/admin/usuarios`  | Admin |
+| `AdminRelatoriosPage` | `/admin/relatorios`| Admin ou `hasRelatorioAccess` |
 
-## 2. Adicionar campo ao modelo User (server/models/User.js)
+### AdminUsuariosPage — `/admin/usuarios`
+- Gerenciar efetivo: criar, editar, excluir militares
+- Modal com toggle **hasChamadaAccess** (acesso ao sistema de chamada)
+- Modal com toggle **hasRelatorioAccess** (acesso ao painel de relatórios)
+- Filtro por tipo de acesso
 
-Dentro do `userSchema`, adicione:
+### AdminRelatoriosPage — `/admin/relatorios` (somente leitura)
+- **📅 Chamadas do Dia** — navegar dia a dia (◄ ►), ver chamadas enviadas, lista de presença, baixar Word
+- **📊 Efetivo Geral** — tabela consolidada de faltas/atrasos/irregularidades
+- **👤 Por Militar** — buscar e ver histórico completo de qualquer soldado
+
+---
+
+## Campos no modelo User (server/models/User.js)
 
 ```js
-hasChamadaAccess: { type: Boolean, default: false },
+hasChamadaAccess:   { type: Boolean, default: false },
+hasRelatorioAccess: { type: Boolean, default: false },
 ```
 
-## 3. Registrar rotas no server.js
-
-As novas rotas já estão no `server.js` desta versão. Certifique-se de que estão na ordem correta:
-
-```js
-app.use('/api/planilha',   require('./routes/exportDocx')); // ANTES do planilha geral
-app.use('/api/planilha',   require('./routes/planilha'));
-app.use('/api/chamada',    require('./routes/chamada'));
-app.use('/api/auditoria',  require('./routes/auditoria'));
-app.use('/api/permissoes', require('./routes/permissoes'));
-```
-
-## 4. Adicionar rotas no React Router (App.js ou Routes.js)
+## Rotas no React Router
 
 ```jsx
+import AdminUsuariosPage   from './pages/admin/AdminUsuariosPage';
 import AdminRelatoriosPage from './pages/admin/AdminRelatoriosPage';
 import ChamadaPage         from './pages/chamada/ChamadaPage';
 import AuditoriaPage       from './pages/chamada/AuditoriaPage';
 
-// Dentro do seu <Routes> / <Switch>:
-
-// Página de relatórios (só admin)
-<Route path="/admin/relatorios" element={
-  <RequireAdmin><AdminRelatoriosPage /></RequireAdmin>
-} />
-
-// Sistema de chamada (admin OU hasChamadaAccess)
-<Route path="/chamada"   element={<RequireChamadaAccess><ChamadaPage /></RequireChamadaAccess>} />
-<Route path="/auditoria" element={<RequireChamadaAccess><AuditoriaPage /></RequireChamadaAccess>} />
+<Route path="/admin/usuarios"  element={<RequireAdmin><AdminUsuariosPage /></RequireAdmin>} />
+<Route path="/admin/relatorios" element={<RequireRelatorio><AdminRelatoriosPage /></RequireRelatorio>} />
+<Route path="/chamada"   element={<RequireChamada><ChamadaPage /></RequireChamada>} />
+<Route path="/auditoria" element={<RequireChamada><AuditoriaPage /></RequireChamada>} />
 ```
 
-### Componente RequireChamadaAccess
-
 ```jsx
-function RequireChamadaAccess({ children }) {
+function RequireAdmin({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin') return <Navigate to="/" />;
+  return children;
+}
+
+function RequireRelatorio({ children }) {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+  if (user.role !== 'admin' && !user.hasRelatorioAccess) return <Navigate to="/" />;
+  return children;
+}
+
+function RequireChamada({ children }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" />;
   if (user.role !== 'admin' && !user.hasChamadaAccess) return <Navigate to="/" />;
@@ -56,30 +64,14 @@ function RequireChamadaAccess({ children }) {
 }
 ```
 
-## 5. O que cada arquivo faz
+## API: rota PUT /api/users/:id deve aceitar os novos campos
 
-| Arquivo | Onde usar |
-|---------|-----------|
-| `pages/admin/AdminRelatoriosPage.js` | Rota `/admin/relatorios` — 3 abas: Militares, Relatório Geral, Chamadas |
-| `pages/admin/AdminRelatorios.css`    | Importado automaticamente pelo AdminRelatoriosPage |
-| `pages/admin/AdminSchedulePage.js`   | Rota `/admin/escala` — escala mensal, sem as abas removidas |
-| `pages/chamada/ChamadaPage.js`       | Rota `/chamada` — fazer chamada, marcar presença |
-| `pages/chamada/AuditoriaPage.js`     | Rota `/auditoria` — auditar fardamento/TFM |
-| `pages/chamada/Chamada.css`          | Importado pelos arquivos de chamada/auditoria |
-| `server/routes/chamada.js`           | API chamada (BUG CORRIGIDO: stats antes de /:id) |
-| `server/routes/auditoria.js`         | API auditoria (BUG CORRIGIDO: stats antes de /:id) |
-| `server/routes/exportDocx.js`        | API download Word da escala |
-| `server/routes/permissoes.js`        | API gerenciar hasChamadaAccess |
+```js
+const { warName, warNumber, rank, role, hasChamadaAccess, hasRelatorioAccess, password } = req.body;
+const updates = { warName, warNumber, rank, role, hasChamadaAccess, hasRelatorioAccess };
+if (password) updates.password = await bcrypt.hash(password, 10);
+```
 
-## 6. Bugs corrigidos nesta versão
-
-- ✅ Soldados não apareciam na lista da chamada
-  - Causa: rota `/stats/soldado/:userId` ficava DEPOIS de `/:id` e era capturada errada pelo Express
-  - Fix: movida para ANTES de `/:id` em chamada.js e auditoria.js
-
-- ✅ Lista de soldados vazia no modal de escala
-  - Causa: `uRes.data || []` não tratava resposta `{ users: [...] }`
-  - Fix: `uRes.data?.users || uRes.data || []`
-
-- ✅ Abas "Militares" e "Chamadas" removidas da Escala
-  - Agora ficam exclusivamente em `/admin/relatorios`
+## Campos TFM configuráveis (AuditoriaPage)
+- Botão **⚙️ Campos TFM** na página de auditoria
+- Salvo em `localStorage` com chave `sim_tfm_fields`
